@@ -1,0 +1,121 @@
+stage=0
+tidy=0
+dir=/exports/eddie/scratch/s2249132/data/payen
+project=payen_healthy_4
+n=0
+ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/
+logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs
+destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger
+srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src
+
+
+
+while read sample; do ./src/submit.jobs.sh ${sample} parameters.${sample}; done < payen_files.txt
+
+#To run buonomo fibrosis
+#Move to the main scratch home
+#Move param files and the _files.txt to this space and then run
+seq 1 40 > buonomo_fibrosis_list.txt
+while read numb; do echo buonomo_fibrosis_${numb} >> buonomo_fibrosis_files.txt; done < buonomo_fibrosis_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < buonomo_fibrosis_files.txt
+
+seq 1 52 > buonomo_healthy_list.txt
+while read numb; do echo buonomo_healthy_${numb} >> buonomo_healthy_files.txt; done < buonomo_healthy_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < buonomo_healthy_files.txt
+
+seq 1 197 > aizarani_list.txt
+while read numb; do echo aizarani_${numb} >> aizarani_files.txt; done < aizarani_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < aizarani_files.txt
+
+
+same name system
+feed the name of the sample
+parameter file is name.parameters
+payen_healthy_1
+payen_healthy_1.parameters
+
+
+replace _1 with _L001_R1_001
+replace _2 with _L001_R2_001
+
+mv SRR12739443_1.fastq.gz SRR12739443_S1_L001_R1_001.fastq.gz
+mv SRR12739443_2.fastq.gz SRR12739443_S1_L001_R2_001.fastq.gz
+
+mv SRR12739446 payen_healthy_4
+
+mv SRR12739446_L001_R1_001.fastq.gz SRR12739446_S1_L001_R1_001.fastq.gz
+mv SRR12739446_L001_R2_001.fastq.gz SRR12739446_S1_L001_R2_001.fastq.gz
+
+while read id; do ./src/submit.jobs.sh ${id} parameters.${id}; done < sanyal.nucseq.submit
+
+wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/001/SRR8371265/SRR8371265_1.fastq.gz
+
+wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/005/SRR8371265/SRR8371265_1.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/005/SRR8371265/SRR8371265_2.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/006/SRR8371266/SRR8371266_1.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/007/SRR8371267/SRR8371267_1.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/008/SRR8371268/SRR8371268_1.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/009/SRR8371269/SRR8371269_1.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/000/SRR8371270/SRR8371270_1.fastq.gz
+
+mkdir aizarani
+
+count_newdir = 1
+count_12 = 1
+for i in range(1265 - 1461):
+
+seq 1265 1461 > numbers.txt
+
+  SRR19174196
+
+
+count=$((1))
+count2=$((5))
+
+while read id; do
+  mkdir aizarani_${count}
+  cd aizarani_${count}
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/00${count2}/SRR837${id}/SRR837${id}_1.fastq.gz
+  mv SRR837${id}_1.fastq.gz SRR1273${id}_S1_L001_R1_001.fastq.gz
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/00${count2}/SRR837${id}/SRR837${id}_2.fastq.gz
+  mv SRR837${id}_2.fastq.gz SRR1273${id}_S1_L001_R2_001.fastq.gz
+  cd ..
+  echo stage=0 > params.aizarani_${count}
+  echo tidy=0 >> params.aizarani_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/aizarani >> params.aizarani_${count}
+  echo project=aizarani_${count} >> params.aizarani_${count}
+  echo n=0 >> params.aizarani_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.aizarani_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.aizarani_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/aizarani >> params.aizarani_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.aizarani_${count}
+  count=$((count+1))
+  if [ $count2 -gt 8 ]
+  then
+    count2=$((0))
+  else
+    count2=$((count2+1))
+  fi
+done < numbers.txt
+
+while read id; do ./src/submit.jobs.sh aizarani_${id} parameters.aizarani_${id}; done < aizarani_numbers.txt
+seq 1 total > aizarani_numbers.txt
+
+
+cat /exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs/call.aizarani_100.o28748675
+
+
+ftp://ftp.sra.ebi.ac.uk/vol1/run/ERR924/ERR9249377/BCR_Pan_T7918905_S1_L001_R1_001.fastq.gz
+ftp://ftp.sra.ebi.ac.uk/vol1/run/ERR924/ERR9249377/BCR_Pan_T7918905_S1_L001_R2_001.fastq.gz
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR162/061/SRR16227561/SRR16227561.fastq.gz
+
+while read id; do ./src/submit.jobs.sh ${id} parameters.${id}; done < sanyal.nucseq.submit
+
+rsync -auv ./buonomo/buonomo_healthy*output /exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/data

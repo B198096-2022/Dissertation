@@ -1,0 +1,210 @@
+
+seq 1265 1461 > numbers.txt
+
+  SRR19174196
+
+
+count=$((1))
+count2=$((5))
+
+while read id; do
+  count2=${id: -1}
+  mkdir aizarani_${count}
+  cd aizarani_${count}
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/00${count2}/SRR837${id}/SRR837${id}_1.fastq.gz
+  mv SRR837${id}_1.fastq.gz SRR1273${id}_S1_L001_R1_001.fastq.gz
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/00${count2}/SRR837${id}/SRR837${id}_2.fastq.gz
+  mv SRR837${id}_2.fastq.gz SRR1273${id}_S1_L001_R2_001.fastq.gz
+  cd ..
+  echo stage=0 > params.aizarani_${count}
+  echo tidy=0 >> params.aizarani_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/aizarani >> params.aizarani_${count}
+  echo project=aizarani_${count} >> params.aizarani_${count}
+  echo n=0 >> params.aizarani_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.aizarani_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.aizarani_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/aizarani >> params.aizarani_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.aizarani_${count}
+  count=$((count+1))
+  fi
+done < numbers.txt
+
+cp -r /exports/eddie/scratch/s2249132/data/buonomo/buonomo_fibrosis_3* .
+cp -r /exports/eddie/scratch/s2249132/data/buonomo/buonomo_fibrosis_40* .
+
+seq 41 65 > numbers.txt
+
+while read id; do
+  count2=${id: -1}
+  echo ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR837/00${count2}/SRR837${id}/SRR837${id}_1.fastq.gz
+done < numbers.txt
+
+#
+SRR191/007/SRR19174107
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR191/005/SRR19174105/SRR19174105_1.fastq.gz
+
+count=$((1))
+
+while read id; do
+  count2=${id: -2}
+  mkdir buonomo_healthy_${count}
+  cd buonomo_healthy_${count}
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR191/0${count2}/SRR191741${id}/SRR191741${id}_1.fastq.gz
+  mv SRR191741${id}_1.fastq.gz SRR191741${id}_S1_L001_R1_001.fastq.gz
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR191/0${count2}/SRR191741${id}/SRR191741${id}_2.fastq.gz
+  mv SRR191741${id}_2.fastq.gz SRR191741${id}_S1_L001_R2_001.fastq.gz
+  cd ..
+  echo stage=0 > params.buonomo_healthy_${count}
+  echo tidy=0 >> params.buonomo_healthy_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/buonomo >> params.buonomo_healthy_${count}
+  echo project=buonomo_healthy_${count} >> params.buonomo_healthy_${count}
+  echo n=0 >> params.buonomo_healthy_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.buonomo_healthy_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.buonomo_healthy_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/buonomo >> params.buonomo_healthy_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.buonomo_healthy_${count}
+  count=$((count+1))
+done < buonomo_healthy_numbers.txt
+
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR191/013/SRR19174113/SRR19174113_1.fastq.gz
+
+seq 79 91 >> buonomo_healthy_numbers.txt
+echo 96 >> buonomo_healthy_numbers.txt
+echo 07 >> buonomo_healthy_numbers.txt
+echo 08 >> buonomo_healthy_numbers.txt
+06 >> buonomo_healthy_numbers.txt
+07 >> buonomo_healthy_numbers.txt
+
+05-08, 13-24, 33-40, 57-60, 63-70, 73-74, 79-91, 96
+
+./submit.pull.sh buonomo_fibrosis pull_parameters.buonomo_fibrosis
+
+echo 09 >> buonomo_fibrosis_numbers.txt
+seq 75 78 >> buonomo_fibrosis_numbers.txt
+seq 92 95 >> buonomo_fibrosis_numbers.txt
+09-12, 25-32, 41-56, 61-62, 71-72, 75-78, 92-95
+
+buonomo_fibrosis_numbers.txt
+echo big_dir=buonomo > pull_parameters.buonomo_fibrosis
+echo sub_dir=buonomo_fibrosis >> pull_parameters.buonomo_fibrosis
+echo SRR_short=SRR191 >> pull_parameters.buonomo_fibrosis
+echo SRR_long=SRR191741 >> pull_parameters.buonomo_fibrosis
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> pull_parameters.buonomo_fibrosis
+
+/exports/eddie/scratch/s2249132/data
+
+qsub -N pull.buonomo_healthy -cwd -l h_vmem=32g -V -v parameters=${parameters} -j y -o ${logdir}/ ${srcdir}/call.sh
+
+
+./submit.pull.sh buonomo_healthy pull_parameters.buonomo_healthy
+/exports/eddie/scratch/s2249132/data/data_pull.sh big_dir sub_sir SRR_short SRR_long
+
+##############################
+#  My script for pulling the #
+#  data using eddie          #
+##############################
+./submit.pull.sh buonomo_healthy pull_parameters.buonomo_healthy
+
+pull_parameters.buonomo_healthy
+echo big_dir=buonomo > pull_parameters.buonomo_healthy
+echo sub_dir=buonomo_healthy >> pull_parameters.buonomo_healthy
+echo SRR_short=SRR191 >> pull_parameters.buonomo_healthy
+echo SRR_long=SRR191741 >> pull_parameters.buonomo_healthy
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> pull_parameters.buonomo_healthy
+
+submit.pull.sh
+#!/bin/bash
+jid=$1
+parameters=$2
+
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+qsub -N pull.${jid} -cwd -l h_vmem=32g -V -v parameters=${parameters} -j y -o ${logdir}/ /exports/eddie/scratch/s2249132/data/data_pull.sh
+
+
+data_pull.sh
+#!/bin/bash
+
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+count=$((1))
+
+while read id; do
+  count2=${id: -2}
+  mkdir /exports/eddie/scratch/s2249132/data/${big_dir}/${sub_dir}_${count}
+  cd /exports/eddie/scratch/s2249132/data/${big_dir}/${sub_dir}_${count}
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/${SRR_short}/0${count2}/${SRR_long}${id}/${SRR_long}${id}_1.fastq.gz
+  mv ${SRR_long}${id}_1.fastq.gz ${SRR_long}${id}_S1_L001_R1_001.fastq.gz
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/${SRR_short}/0${count2}/${SRR_long}${id}/${SRR_long}${id}_2.fastq.gz
+  mv ${SRR_long}${id}_2.fastq.gz ${SRR_long}${id}_S1_L001_R2_001.fastq.gz
+  cd /exports/eddie/scratch/s2249132/data/${big_dir}
+  echo stage=0 > params.${sub_dir}_${count}
+  echo tidy=0 >> params.${sub_dir}_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/${big_dir} >> params.${sub_dir}_${count}
+  echo project=${sub_dir}_${count} >> params.${sub_dir}_${count}
+  echo n=0 >> params.${sub_dir}_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.${sub_dir}_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.${sub_dir}_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/${big_dir} >> params.${sub_dir}_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.${sub_dir}_${count}
+  count=$((count+1))
+done < ${sub_dir}_numbers.txt
+
+#################################################################
+
+check that they all have 2 files!
+
+
+big_dir=$1
+sub_dir=$2
+SRR_short=$3
+SRR_long=$4
+logdir=$5
+
+
+./test.pull.sh blah buonomo_healthy
+
+./test.submit.pull.sh buonomo_healthy pull_parameters.buonomo_healthy
+
+test.submit.pull.sh
+#!/bin/bash
+jid=$1
+parameters=$2
+
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+echo ${parameters}
+
+#!/bin/bash
+sub_dir=$2
+
+while read id; do
+  echo ${id}
+done < ${sub_dir}_numbers.txt
+
+echo ${sub_dir:="aizarani"}
+echo ${big_dir:="aizarani"}
+count=$((1))
+
+while read id; do
+  count2=${id: -2}
+  echo stage=0 > params.${sub_dir}_${count}
+  echo tidy=0 >> params.${sub_dir}_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/${big_dir} >> params.${sub_dir}_${count}
+  echo project=${sub_dir}_${count} >> params.${sub_dir}_${count}
+  echo n=0 >> params.${sub_dir}_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.${sub_dir}_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.${sub_dir}_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/${big_dir} >> params.${sub_dir}_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.${sub_dir}_${count}
+  count=$((count+1))
+done < ${sub_dir}_numbers.txt
