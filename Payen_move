@@ -1,0 +1,28 @@
+seq 1 4 > payen_healthy_list.txt
+while read numb; do echo payen_healthy_${numb} >> payen_healthy_files.txt; done < payen_healthy_list.txt
+
+seq 1 4 > payen_healthy_numbers.txt
+
+unset big_dir
+echo ${big_dir:=payen}
+unset sub_dir
+echo ${sub_dir:=payen_healthy}
+count=$((1))
+
+while read id; do
+  echo stage=0 > params.${sub_dir}_${count}
+  echo tidy=0 >> params.${sub_dir}_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/${big_dir} >> params.${sub_dir}_${count}
+  echo project=${sub_dir}_${count} >> params.${sub_dir}_${count}
+  echo n=0 >> params.${sub_dir}_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.${sub_dir}_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.${sub_dir}_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/${big_dir} >> params.${sub_dir}_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.${sub_dir}_${count}
+  count=$((count+1))
+done < ${sub_dir}_numbers.txt
+
+#I made a z_submit that just comments out the call command, so it just runs the tidy function
+#And I renamed the job z_tidy.project
+
+while read sample; do ./z_submit.sh ${sample} params.${sample}; done < payen_healthy_files.txt

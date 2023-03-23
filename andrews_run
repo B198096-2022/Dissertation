@@ -1,0 +1,80 @@
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR162/061/SRR16227561/SRR16227561.fastq.gz
+
+
+#This is the final command
+#The script, the project name, and the pull parameters file
+./submit.pull.sh andrews_healthy pull_parameters.andrews_healthy
+
+#Making the pull parameters file
+#big_dir is the dir for the full dataset
+#sub_dir is for if there are multiple experimental groups (healthy vs fibrosis)
+#SRR_short is the beginning of the SRR id that appears in the url
+#SRR_long is the repeating portion of the full SRR id in the  url,
+#       whatever is not specified by the project_numbers.txt
+pull_parameters.andrews_healthy
+echo big_dir=andrews > pull_parameters.andrews_healthy
+echo sub_dir=andrews_healthy >> pull_parameters.andrews_healthy
+echo SRR_short=SRR162 >> pull_parameters.andrews_healthy
+echo SRR_long=SRR16227 >> pull_parameters.andrews_healthy
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> pull_parameters.andrews_healthy
+
+seq 561 569 > andrews_healthy_numbers.txt
+seq 571 576 > andrews_healthy_numbers.txt
+seq 578 583 > andrews_healthy_numbers.txt
+
+
+
+
+/exports/eddie/scratch/s2249132/data/aizarani/aizarani_16
+
+submit.pull.sh
+#!/bin/bash
+jid=$1
+parameters=$2
+
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+qsub -N pull.${jid} -cwd -l h_vmem=32g -V -v parameters=${parameters} -j y -o ${logdir}/ /exports/eddie/scratch/s2249132/data/data_pull.sh
+
+
+data_pull.sh
+#!/bin/bash
+
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+count=$((1))
+
+while read id; do
+  count2=${id: -2}
+  mkdir /exports/eddie/scratch/s2249132/data/${big_dir}/${sub_dir}_${count}
+  cd /exports/eddie/scratch/s2249132/data/${big_dir}/${sub_dir}_${count}
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/${SRR_short}/0${count2}/${SRR_long}${id}/${SRR_long}${id}_1.fastq.gz
+  mv ${SRR_long}${id}_1.fastq.gz ${SRR_long}${id}_S1_L001_R1_001.fastq.gz
+  wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/${SRR_short}/0${count2}/${SRR_long}${id}/${SRR_long}${id}_2.fastq.gz
+  mv ${SRR_long}${id}_2.fastq.gz ${SRR_long}${id}_S1_L001_R2_001.fastq.gz
+  cd /exports/eddie/scratch/s2249132/data/${big_dir}
+  echo stage=0 > params.${sub_dir}_${count}
+  echo tidy=0 >> params.${sub_dir}_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/${big_dir} >> params.${sub_dir}_${count}
+  echo project=${sub_dir}_${count} >> params.${sub_dir}_${count}
+  echo n=0 >> params.${sub_dir}_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.${sub_dir}_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.${sub_dir}_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/${big_dir} >> params.${sub_dir}_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.${sub_dir}_${count}
+  count=$((count+1))
+done < ${sub_dir}_numbers.txt
+
+
+#To run cell cellranger
+#Move to the main scratch home
+#Move param files and the project_files.txt to this space and then run
+seq 1 20 > andrews_healthy_list.txt
+while read numb; do echo andrews_healthy_${numb} >> andrews_healthy_files.txt; done < andrews_healthy_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < andrews_healthy_files.txt
