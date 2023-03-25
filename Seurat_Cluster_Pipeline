@@ -1,0 +1,59 @@
+#setup libraries and cwd
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(sctransform)
+
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer")
+
+
+#Specify the files you want to run 
+Files <- paste0("./cellranger/buonomo/buonomo_healthy_", 1:52, "/outs/filtered_feature_bc_matrix/")
+Destination <- paste0("./analysis/buonomo_healthy_", 1:52, "_UMAP.rds")
+
+range <- 1:52
+
+Sce <- list()
+
+for (i in range) {
+  sce.temp <- Read10X(Files[[i]])
+  nam <- paste0("bh", i)
+  obj.temp <- CreateSeuratObject(counts = sce.temp, project = nam, min.cells = 3, min.features = 200)
+  obj.temp[["percent.mt"]] <- PercentageFeatureSet(obj.temp, pattern = "^MT-")
+  Sce[[i]] <- obj.temp
+  assign(nam, Sce[[i]])
+}
+
+
+#Filter
+test_f <- lapply(Sce, subset, subset = nFeature_RNA > 800 & nCount_RNA > 300 & percent.mt < 30)
+
+#SCTransform
+test_sct <- lapply(test_f, SCTransform, vars.to.regress = "percent.mt", verbose = FALSE)
+
+#Run PCA
+test_p <- lapply(test_sct, RunPCA, verbose = FALSE)
+
+#Run UMAP 
+test_u <- lapply(test_p, RunUMAP, dims = 1:30, verbose = FALSE)
+
+#Clustering 
+test_uc <- lapply(test_u, FindNeighbors, dims = 1:30, verbose = FALSE)
+test_uc <- lapply(test_uc, FindClusters, verbose = FALSE)
+
+for (i in range) {
+  saveRDS(test_uc[[i]], file = Destination[i])
+}
+
+
+#Generating plots if wanted 
+lapply(test_uc, DimPlot, label = TRUE) 
+
+lapply(test_uc, VlnPlot, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+lapply(Sce, VlnPlot, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+lapply(test_f, VlnPlot, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+
+
