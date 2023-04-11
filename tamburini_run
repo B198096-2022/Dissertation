@@ -1,0 +1,236 @@
+
+module load igmm/apps/cellranger/7.0.0
+
+#Downloading the bam files with scripts on eddie
+
+
+th1get.sh
+#!/bin/bash
+wget -O tamburini_healthy_1.bam https://sra-pub-src-1.s3.amazonaws.com/SRR8921370/nd1.bam.1
+
+mv ./nd1.bam.1 ./tamburini_healthy_1.bam
+
+
+th2get.sh
+#!/bin/bash
+wget -O tamburini_healthy_2.bam https://sra-pub-src-1.s3.amazonaws.com/SRR8921371/nd2.bam.1
+
+mv ./nd1.bam.2 ./tamburini_healthy_2.bam
+
+
+tf1get.sh
+#!/bin/bash
+wget -O tamburini_fibrosis_1.bam https://sra-pub-src-1.s3.amazonaws.com/SRR8921372/nash.bam.1
+
+mv ./nash.bam.1 ./tamburini_fibrosis_1.bam
+
+
+tf2get.sh
+#!/bin/bash
+wget -O tamburini_fibrosis_2.bam https://sra-pub-src-1.s3.amazonaws.com/SRR8921373/hcv.bam.1
+
+mv ./hcv.bam.1 ./tamburini_fibrosis_2.bam
+
+
+qsub -N btf.th1 -cwd -q staging  -j y -o . ./th1get.sh
+qsub -N btf.th2 -cwd -q staging  -j y -o . ./th2get.sh
+qsub -N btf.tf1 -cwd -q staging  -j y -o . ./tf1get.sh
+qsub -N btf.tf2 -cwd -q staging  -j y -o . ./tf2get.sh
+
+#Making scripts for the bamtofastq step
+
+th1btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/tamburini/tamburini_healthy_1.bam /exports/eddie/scratch/s2249132/data/tamburini/th1_fq_script
+
+th2btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/tamburini/tamburini_healthy_2.bam /exports/eddie/scratch/s2249132/data/tamburini/th2_fq_script
+
+
+tf1btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/tamburini/tamburini_fibrosis_1.bam /exports/eddie/scratch/s2249132/data/tamburini/tf1_fq_script
+
+tf2btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/tamburini/tamburini_fibrosis_2.bam /exports/eddie/scratch/s2249132/data/tamburini/tf2_fq_script
+
+
+#Running the bamtofastq scripts on eddie
+qsub -N btf_s.th1 -cwd -q staging -V -j y -o . ./th1btf.sh
+qsub -N btf_s.th2 -cwd -q staging -V -j y -o . ./th2btf.sh
+qsub -N btf_s.tf1 -cwd -q staging -V -j y -o . ./tf1btf.sh
+qsub -N btf_s.tf2 -cwd -q staging -V -j y -o . ./tf2btf.sh
+
+
+#Move the fastq files out of the sub/sub directory and into the sub directory
+#Example, an2_fq has sub dir Normal1_0_1_HNKH5BBXX which contains all the fastq files
+#cd th1_fq_script
+#mv ./Normal1_0_1_HNKH5BBXX/* .
+#rm -r Normal1_0_1_HNKH5BBXX
+
+
+#Make the params file but for the healthy samples
+seq 1 2 >> tamburini_healthy_numbers.txt
+count=$((1))
+
+while read id; do
+  echo stage=0 > params.tamburini_healthy_${count}
+  echo tidy=0 >> params.tamburini_healthy_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/tamburini >> params.tamburini_healthy_${count}
+  echo project=th${count}_fq_script >> params.tamburini_healthy_${count}
+  echo n=0 >> params.tamburini_healthy_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.tamburini_healthy_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.tamburini_healthy_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/tamburini >> params.tamburini_healthy_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.tamburini_healthy_${count}
+  count=$((count+1))
+done < tamburini_healthy_numbers.txt
+
+#Then run the cellranger script
+./src/submit.jobs.sh tamburini_healthy_1 params.tamburini_healthy_1
+./src/submit.jobs.sh tamburini_healthy_2 params.tamburini_healthy_2
+
+
+#Make the params files for the diseased samples
+seq 1 2 >> tamburini_fibrosis_numbers.txt
+count=$((1))
+
+while read id; do
+  echo stage=0 > params.tamburini_fibrosis_${count}
+  echo tidy=0 >> params.tamburini_fibrosis_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/tamburini >> params.tamburini_fibrosis_${count}
+  echo project=tf${count}_fq_script >> params.tamburini_fibrosis_${count}
+  echo n=0 >> params.tamburini_fibrosis_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.tamburini_fibrosis_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.tamburini_fibrosis_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/tamburini >> params.tamburini_fibrosis_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.tamburini_fibrosis_${count}
+  count=$((count+1))
+done < tamburini_fibrosis_numbers.txt
+
+#Then run the cellranger script
+./src/submit.jobs.sh tamburini_fibrosis_1 params.tamburini_fibrosis_1
+./src/submit.jobs.sh tamburini_fibrosis_2 params.tamburini_fibrosis_2
+
+
+
+
+
+
+
+
+
+
+mv ./bam_out/Normal1_0_1_HNKH5BBXX/tamburini_healthy_1_S1_L001_I1_001.fastq.gz ./tamburini_healthy_1
+mv ./bam_out/Normal1_0_1_HNKH5BBXX/tamburini_healthy_1_S1_L001_I1_002.fastq.gz ./tamburini_healthy_1
+mv ./bam_out/Normal1_0_1_HNKH5BBXX/tamburini_healthy_1_S1_L001_R1_001.fastq.gz ./tamburini_healthy_1
+mv ./bam_out/Normal1_0_1_HNKH5BBXX/tamburini_healthy_1_S1_L001_R1_002.fastq.gz ./tamburini_healthy_1
+mv ./bam_out/Normal1_0_1_HNKH5BBXX/tamburini_healthy_1_S1_L001_R2_001.fastq.gz ./tamburini_healthy_1
+mv ./bam_out/Normal1_0_1_HNKH5BBXX/tamburini_healthy_1_S1_L001_R2_002.fastq.gz ./tamburini_healthy_1
+
+mv ./tamburini_healthy_1_S1_L001_I1_001.fastq.gz
+mv ./bamtofastq_S1_L001_I1_002.fastq.gz ./tamburini_healthy_1_S1_L002_I1_001.fastq.gz
+mv ./bamtofastq_S1_L001_R1_001.fastq.gz ./tamburini_healthy_1_S1_L001_R1_001.fastq.gz
+mv ./bamtofastq_S1_L001_R1_002.fastq.gz ./tamburini_healthy_1_S1_L002_R1_001.fastq.gz
+mv ./bamtofastq_S1_L001_R2_001.fastq.gz ./tamburini_healthy_1_S1_L001_R2_001.fastq.gz
+mv ./bamtofastq_S1_L001_R2_002.fastq.gz ./tamburini_healthy_1_S1_L002_R2_001.fastq.gz
+
+mv ./tamburini_healthy_1_S1_L002_I1_001.fastq.gz ./tamburini_healthy_1_S1_L001_I1_002.fastq.gz
+mv ./tamburini_healthy_1_S1_L002_R1_001.fastq.gz ./tamburini_healthy_1_S1_L001_R1_002.fastq.gz
+mv ./tamburini_healthy_1_S1_L002_R2_001.fastq.gz ./tamburini_healthy_1_S1_L001_R2_002.fastq.gz
+
+
+qsub -N btf.th2 -cwd -q staging  -j y -o . ./tf1get.sh
+
+tf1get.sh
+#!/bin/bash
+wget -O tamburini_fibrosis_1.bam https://sra-pub-src-1.s3.amazonaws.com/SRR8921372/nash.bam.1
+
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/tamburini/tamburini_fibrosis_1.bam /exports/eddie/scratch/s2249132/data/tamburini/tf1_fq
+
+
+qsub -N btf.th2 -cwd -q staging  -j y -o . ./tf2get.sh
+
+tf2get.sh
+#!/bin/bash
+wget -O tamburini_fibrosis_2.bam https://sra-pub-src-1.s3.amazonaws.com/SRR8921373/hcv.bam.1
+
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/tamburini/tamburini_fibrosis_2.bam /exports/eddie/scratch/s2249132/data/tamburini/tf2_fq
+
+
+mv ./th2_fq/*/bamtofastq_S1_L007_I1_001.fastq.gz ./tamburini_healthy_2/tamburini_healthy_2_S1_L007_I1_001.fastq.gz
+mv ./th2_fq/*/bamtofastq_S1_L007_I1_002.fastq.gz ./tamburini_healthy_2/tamburini_healthy_2_S1_L007_I1_002.fastq.gz
+mv ./th2_fq/*/bamtofastq_S1_L007_R1_001.fastq.gz ./tamburini_healthy_2/tamburini_healthy_2_R1_L007_I1_001.fastq.gz
+mv ./th2_fq/*/bamtofastq_S1_L007_R1_002.fastq.gz ./tamburini_healthy_2/tamburini_healthy_2_R1_L007_I1_002.fastq.gz
+mv ./th2_fq/*/bamtofastq_S1_L007_R2_001.fastq.gz ./tamburini_healthy_2/tamburini_healthy_2_R2_L007_I1_001.fastq.gz
+mv ./th2_fq/*/bamtofastq_S1_L007_R2_002.fastq.gz ./tamburini_healthy_2/tamburini_healthy_2_R2_L007_I1_002.fastq.gz
+
+mkdir tamburini_fibrosis_1
+mv ./tf1_fq/*/bamtofastq_S1_L007_I1_001.fastq.gz ./tamburini_fibrosis_1/tamburini_fibrosis_1_S1_L007_I1_001.fastq.gz
+mv ./tf1_fq/*/bamtofastq_S1_L007_I1_002.fastq.gz ./tamburini_fibrosis_1/tamburini_fibrosis_1_S1_L007_I1_002.fastq.gz
+mv ./tf1_fq/*/bamtofastq_S1_L007_R1_001.fastq.gz ./tamburini_fibrosis_1/tamburini_fibrosis_1_R1_L007_I1_001.fastq.gz
+mv ./tf1_fq/*/bamtofastq_S1_L007_R1_002.fastq.gz ./tamburini_fibrosis_1/tamburini_fibrosis_1_R1_L007_I1_002.fastq.gz
+mv ./tf1_fq/*/bamtofastq_S1_L007_R2_001.fastq.gz ./tamburini_fibrosis_1/tamburini_fibrosis_1_R2_L007_I1_001.fastq.gz
+mv ./tf1_fq/*/bamtofastq_S1_L007_R2_002.fastq.gz ./tamburini_fibrosis_1/tamburini_fibrosis_1_R2_L007_I1_002.fastq.gz
+
+mkdir tamburini_fibrosis_2
+mv ./tf2_fq/*/bamtofastq_S1_L001_I1_001.fastq.gz ./tamburini_fibrosis_2/tamburini_fibrosis_2_S1_L001_I1_001.fastq.gz
+mv ./tf2_fq/*/bamtofastq_S1_L001_I1_002.fastq.gz ./tamburini_fibrosis_2/tamburini_fibrosis_2_S1_L001_I1_002.fastq.gz
+mv ./tf2_fq/*/bamtofastq_S1_L001_R1_001.fastq.gz ./tamburini_fibrosis_2/tamburini_fibrosis_2_R1_L001_I1_001.fastq.gz
+mv ./tf2_fq/*/bamtofastq_S1_L001_R1_002.fastq.gz ./tamburini_fibrosis_2/tamburini_fibrosis_2_R1_L001_I1_002.fastq.gz
+mv ./tf2_fq/*/bamtofastq_S1_L001_R2_001.fastq.gz ./tamburini_fibrosis_2/tamburini_fibrosis_2_R2_L001_I1_001.fastq.gz
+mv ./tf2_fq/*/bamtofastq_S1_L001_R2_002.fastq.gz ./tamburini_fibrosis_2/tamburini_fibrosis_2_R2_L001_I1_002.fastq.gz
+
+
+
+#Move the fastq files out of the sub/sub directory and into the sub directory
+#Example, an2_fq has sub dir Normal1_0_1_HNKH5BBXX which contains all the fastq files
+#cd th1_fq_script
+#mv ./Normal1_0_1_HNKH5BBXX/* .
+#rm -r Normal1_0_1_HNKH5BBXX
+
+
+#Make the params file but for the healthy samples
+seq 1 2 >> tamburini_healthy_numbers.txt
+count=$((1))
+
+while read id; do
+  echo stage=0 > params.tamburini_healthy_${count}
+  echo tidy=0 >> params.tamburini_healthy_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/tamburini >> params.tamburini_healthy_${count}
+  echo project=th${count}_fq_script >> params.tamburini_healthy_${count}
+  echo n=0 >> params.tamburini_healthy_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.tamburini_healthy_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.tamburini_healthy_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/tamburini >> params.tamburini_healthy_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.tamburini_healthy_${count}
+  count=$((count+1))
+done < tamburini_healthy_numbers.txt
+
+#Then run the cellranger script
+./src/submit.jobs.sh tamburini_healthy_1 params.tamburini_healthy_1
+./src/submit.jobs.sh tamburini_healthy_2 params.tamburini_healthy_2
+
+
+#Make the params files for the diseased samples
+seq 1 2 >> tamburini_fibrosis_numbers.txt
+count=$((1))
+
+while read id; do
+  echo stage=0 > params.tamburini_fibrosis_${count}
+  echo tidy=0 >> params.tamburini_fibrosis_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/tamburini >> params.tamburini_fibrosis_${count}
+  echo project=tf${count}_fq_script >> params.tamburini_fibrosis_${count}
+  echo n=0 >> params.tamburini_fibrosis_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.tamburini_fibrosis_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.tamburini_fibrosis_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/tamburini >> params.tamburini_fibrosis_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.tamburini_fibrosis_${count}
+  count=$((count+1))
+done < tamburini_fibrosis_numbers.txt
+
+#Then run the cellranger script
+./src/submit.jobs.sh tamburini_fibrosis_1 params.tamburini_fibrosis_1
+./src/submit.jobs.sh tamburini_fibrosis_2 params.tamburini_fibrosis_2
