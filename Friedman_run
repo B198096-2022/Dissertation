@@ -1,0 +1,64 @@
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR214/096/SRR21473996/SRR21473996_1.fastq.gz
+
+#This is the final command
+#Run it in the scratch home space
+#Mkdir the big_dir for all of the data first
+#Both scripts used are in the data dir, but it is specified here
+#The script, the project name, and the pull parameters file
+./data/submit.pull.sh friedman_healthy_nuc pull_parameters.friedman_healthy_nuc
+
+#Making the pull parameters file in home scratch dir
+#big_dir is the dir for the full dataset
+#sub_dir is for if there are multiple experimental groups (healthy vs fibrosis)
+#SRR_short is the beginning of the SRR id that appears in the url
+#SRR_long is the repeating portion of the full SRR id in the  url,
+#       whatever is not specified by the project_numbers.txt
+pull_parameters.friedman_healthy_nuc
+echo big_dir=friedman > pull_parameters.friedman_healthy_nuc
+echo sub_dir=friedman_healthy_nuc >> pull_parameters.friedman_healthy_nuc
+echo SRR_short=SRR214 >> pull_parameters.friedman_healthy_nuc
+echo SRR_long=SRR2147 >> pull_parameters.friedman_healthy_nuc
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/nucranger/logs >> pull_parameters.friedman_healthy_nuc
+
+echo 4010 > friedman_healthy_nuc_numbers.txt
+seq 4013 4014 >> friedman_healthy_nuc_numbers.txt
+
+#################################
+#        Now Fibrosis           #
+#################################
+
+./data/submit.pull.sh friedman_fibrosis_nuc pull_parameters.friedman_fibrosis_nuc
+
+pull_parameters.friedman_fibrosis_nuc
+echo big_dir=friedman > pull_parameters.friedman_fibrosis_nuc
+echo sub_dir=friedman_fibrosis_nuc >> pull_parameters.friedman_fibrosis_nuc
+echo SRR_short=SRR214 >> pull_parameters.friedman_fibrosis_nuc
+echo SRR_long=SRR2147 >> pull_parameters.friedman_fibrosis_nuc
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/nucranger/logs >> pull_parameters.friedman_fibrosis_nuc
+
+seq 3996 4008 >> friedman_fibrosis_nuc_numbers.txt
+seq 4011 4012 >> friedman_fibrosis_nuc_numbers.txt
+
+
+
+
+################################
+#     Run nucranger          #
+################################
+
+
+#To run nuc nucranger
+#Move to the main scratch home
+#Move param files and the project_files.txt to this space and then run
+cp ./data/friedman/params.* .
+#
+cp ./data/friedman/params.friedman_healthy_nuc* .
+seq 1 3 >> friedman_healthy_nuc_list.txt
+while read numb; do echo friedman_healthy_nuc_${numb} >> friedman_healthy_nuc_files.txt; done < friedman_healthy_nuc_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < friedman_healthy_nuc_files.txt
+
+#
+cp ./data/friedman/params.friedman_fibrosis_nuc* .
+seq 1 15 >> friedman_fibrosis_nuc_list.txt
+while read numb; do echo friedman_fibrosis_nuc_${numb} >> friedman_fibrosis_nuc_files.txt; done < friedman_fibrosis_nuc_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < friedman_fibrosis_nuc_files.txt
