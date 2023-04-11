@@ -1,0 +1,112 @@
+GSE185477
+
+https://www.ebi.ac.uk/ena/browser/view/PRJNA769141
+
+#First write all of the the wget scripts
+
+a1get.sh
+#!/bin/bash
+wget -O andrews_nuc_1.bam ftp://ftp.sra.ebi.ac.uk/vol1/run/SRR162/SRR16227558/C41_CST_possorted_genome_bam.bam
+
+a2get.sh
+#!/bin/bash
+wget -O andrews_nuc_2.bam ftp://ftp.sra.ebi.ac.uk/vol1/run/SRR162/SRR16227559/C41_NST_possorted_genome_bam.bam
+
+a3get.sh
+#!/bin/bash
+wget -O andrews_nuc_3.bam ftp://ftp.sra.ebi.ac.uk/vol1/run/SRR162/SRR16227560/C41_TST_possorted_genome_bam.bam
+
+a4get.sh
+#!/bin/bash
+wget -O andrews_nuc_4.bam ftp://ftp.sra.ebi.ac.uk/vol1/run/SRR162/SRR16227570/C58_TST_possorted_genome_bam.bam
+
+a5get.sh
+#!/bin/bash
+wget -O andrews_nuc_5.bam ftp://ftp.sra.ebi.ac.uk/vol1/run/SRR162/SRR16227577/C70_TST_possorted_genome_bam.bam
+
+a6get.sh
+#!/bin/bash
+wget -O andrews_nuc_6.bam ftp://ftp.sra.ebi.ac.uk/vol1/run/SRR162/SRR16227584/C72_TST_possorted_genome_bam.bam
+
+#Then submit the wget scripts
+qsub -N bget.an1 -cwd -q staging  -j y -o . ./a1get.sh
+qsub -N bget.an2 -cwd -q staging  -j y -o . ./a2get.sh
+qsub -N bget.an3 -cwd -q staging  -j y -o . ./a3get.sh
+qsub -N bget.an4 -cwd -q staging  -j y -o . ./a4get.sh
+qsub -N bget.an5 -cwd -q staging  -j y -o . ./a5get.sh
+qsub -N bget.an6 -cwd -q staging  -j y -o . ./a6get.sh
+
+#Load the cellranger module
+module load igmm/apps/cellranger/7.0.0
+
+#Now writing all of the bamtofastq scripts
+
+an1btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/andrews/andrews_nuc_1.bam /exports/eddie/scratch/s2249132/data/andrews/an1_fq
+
+an2btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/andrews/andrews_nuc_2.bam /exports/eddie/scratch/s2249132/data/andrews/an2_fq
+
+an3btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/andrews/andrews_nuc_3.bam /exports/eddie/scratch/s2249132/data/andrews/an3_fq
+
+an4btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/andrews/andrews_nuc_4.bam /exports/eddie/scratch/s2249132/data/andrews/an4_fq
+
+an5btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/andrews/andrews_nuc_5.bam /exports/eddie/scratch/s2249132/data/andrews/an5_fq
+
+an6btf.sh
+#!/bin/bash
+cellranger bamtofastq --nthreads=4 /exports/eddie/scratch/s2249132/data/andrews/andrews_nuc_6.bam /exports/eddie/scratch/s2249132/data/andrews/an6_fq
+
+#Then runn all of the bamtofastq scripts through eddie
+module load igmm/apps/cellranger/7.0.0
+qsub -N btf.an1 -cwd -q staging -V -j y -o . ./an1btf.sh
+qsub -N btf.an2 -cwd -q staging -V -j y -o . ./an2btf.sh
+qsub -N btf.an3 -cwd -q staging -V -j y -o . ./an3btf.sh
+qsub -N btf.an4 -cwd -q staging -V -j y -o . ./an4btf.sh
+qsub -N btf.an5 -cwd -q staging -V -j y -o . ./an5btf.sh
+qsub -N btf.an6 -cwd -q staging -V -j y -o . ./an6btf.sh
+
+
+#Move the fastq files out of the sub/sub directory and into the sub directory
+#Example, an2_fq has sub dir liver_006_NST_0_1_HY2YGCCXY which contains all the fastq files
+#cd an2_fq
+#mv ./liver_006_NST_0_1_HY2YGCCXY/* .
+#rm -r liver_006_NST_0_1_HY2YGCCXY
+
+#Move to the home scratch directory and make the param files
+seq 1 6 >> andrews_nuc_numbers.txt
+count=$((1))
+
+while read id; do
+  echo stage=0 > params.andrews_nuc_${count}
+  echo tidy=0 >> params.andrews_nuc_${count}
+  echo dir=/exports/eddie/scratch/s2249132/data/andrews >> params.andrews_nuc_${count}
+  echo project=an${count}_fq >> params.andrews_nuc_${count}
+  echo n=0 >> params.andrews_nuc_${count}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.andrews_nuc_${count}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.andrews_nuc_${count}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/andrews >> params.andrews_nuc_${count}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.andrews_nuc_${count}
+  count=$((count+1))
+done < andrews_nuc_numbers.txt
+
+#Then run the cellranger script
+./src/submit.jobs.sh andrews_nuc_1 params.andrews_nuc_1
+./src/submit.jobs.sh andrews_nuc_2 params.andrews_nuc_2
+./src/submit.jobs.sh andrews_nuc_3 params.andrews_nuc_3
+
+./src/submit.jobs.sh andrews_nuc_4 params.andrews_nuc_4
+
+#an5_fq's directory is called MacParland_Sonya__C70_NUC_TST_3pr_v3_0_1_HT3CTDMXX and has 12 runs!
+./src/submit.jobs.sh andrews_nuc_5 params.andrews_nuc_5
+
+#an6_fq's directory is called MacParland_Sonya__C72_NUC_TST_3pr_v3_0_1_HT3CTDMXX and has 12 runs!
+./src/submit.jobs.sh andrews_nuc_6 params.andrews_nuc_6
