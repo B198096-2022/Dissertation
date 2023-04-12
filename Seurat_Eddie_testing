@@ -1,0 +1,171 @@
+#Make a pipeline that has a parameters file
+#The parameters have filter metrics, what is saved
+#File names
+#then you have a single processing run for each file
+#Loop through the individual runs
+#So png is not inside of a loop, once per run
+
+
+module load R
+
+Rscript my_script.R arg1 arg2 ...
+
+#To pass it arguments
+args = commandArgs(trailingOnly=TRUE)
+x <- args[1]
+y <- args[2]
+.
+.
+.
+
+
+
+
+
+#To run the pipeline pass it your parameters
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+qsub -N cluster.${jid} -cwd -l h_vmem=32g -V -v parameters=${parameters} -j y -o ${logdir}/ ${srcdir}/cluster.sh
+
+run_filter file_id filter_params save_plt1 save_plt2 save_plt3
+
+
+#!/bin/R
+args = commandArgs(trailingOnly=TRUE)
+file_id <- args[1]
+filter_params <- args[2]
+
+
+
+
+
+
+install.packages('Seurat', "/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/R_packages")
+
+module load igmm/apps/R/4.2.2
+Rscript seurat_pipeline.R 2 buonomo healthy bh
+
+#Not enough memory to run it...
+
+#!/bin/R
+
+#######################################################
+#  This script takes a set of cellranger outputs      #
+#  And runs them through seurat to get a processed    #
+#  Seurat object that has been sctransformed and      #
+#  gone through PCA and UMPA                          #
+#  Currently no filtering is performed!               #
+#######################################################
+
+
+#pull in the arguments
+args = commandArgs(trailingOnly=TRUE)
+file_numb <- args[1]
+author <- args[2]
+sample_type <- args[3]
+project_name <- args[4]
+
+#Set directory to my folder on data store
+setwd("/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer")
+
+
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(sctransform)
+
+
+
+Files <- paste0("./cellranger/",author,"/",author,"_",sample_type,"_", 1:file_numb, "/outs/filtered_feature_bc_matrix/")
+Destination <- paste0("./analysis/",author,"_",sample_type,"_", 1:file_numb, "_UMAP.rds")
+
+range <- 1:file_numb
+
+Sce <- list()
+
+for (i in range) {
+  sce.temp <- Read10X(Files[[i]])
+  nam <- paste0(project_name, i)
+  obj.temp <- CreateSeuratObject(counts = sce.temp, project = nam, min.cells = 3, min.features = 200)
+  obj.temp[["percent.mt"]] <- PercentageFeatureSet(obj.temp, pattern = "^MT-")
+  Sce[[i]] <- obj.temp
+  assign(nam, Sce[[i]])
+}
+
+#Filter - currently set to not filter anything
+test_f <- lapply(Sce, subset, subset = nFeature_RNA > 0 & nCount_RNA > 0 & percent.mt < 100)
+
+#SCTransform
+test_sct <- lapply(test_f, SCTransform, vars.to.regress = "percent.mt", verbose = FALSE)
+
+#Run PCA
+test_p <- lapply(test_sct, RunPCA, verbose = FALSE)
+
+#Run UMAP
+test_u <- lapply(test_p, RunUMAP, dims = 1:30, verbose = FALSE)
+
+#Clustering
+test_uc <- lapply(test_u, FindNeighbors, dims = 1:30, verbose = FALSE)
+test_uc <- lapply(test_uc, FindClusters, verbose = FALSE)
+
+
+#plots and saving object
+names <- list()
+for (i in range) {
+  names[i] <- paste0(project_name, i)
+}
+
+for (i in range) {
+  saveRDS(test_uc[[i]], file = Destination[i])
+  Rscript /exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/seurat_plots.R names[[i]] Sce[[i]] test_uc[[i]]
+}
+
+
+
+##############################################################
+seurat_plots.R
+
+
+#!/bin/R
+
+##########################
+#                        #
+# Script to output plots #
+#                        #
+##########################
+
+#pull in the arguments
+args = commandArgs(trailingOnly=TRUE)
+sub_name <- args[1]
+Sce <- args[2]
+test_uc <- args[3]
+
+setwd("/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/QC")
+
+plt1_name <- paste0(sub_name,"QC1")
+
+png(plt1_name)
+VlnPlot(Sce, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+dev.off()
+
+plota <- FeatureScatter(Sce, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plotb <- FeatureScatter(Sce, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+plt2_name <- paste0(sub_name,"QC2")
+
+png(plt2_name)
+plota + plotb
+dev.off()
+
+plt3_name <- paste0(sub_name,"UMAP_plt")
+
+png(plt3_name)
+DimPlot(test_uc, label = TRUE) + NoLegend()
+dev.off()
+
+plt4_name <- paste0(sub_name,"UMAP_violin")
+VlnPlot(test_uc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+dev.off()
