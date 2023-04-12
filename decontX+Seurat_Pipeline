@@ -1,0 +1,105 @@
+---
+title: "Seurat_Pipeline"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r setup}
+#setup libraries and cwd
+#BiocManager::install("celda")
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(sctransform)
+library(celda)
+
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer")
+```
+
+```{r files}
+
+#Specify the files you want to run 
+Files <- paste0("./cellranger/buonomo/buonomo_fibrosis_", 1:40, "_output/outs/filtered_feature_bc_matrix/")
+Raws <- Files <- paste0("./cellranger/buonomo/buonomo_fibrosis_", 1:40, "_output/outs/raw_feature_bc_matrix/")
+Destination <- paste0("./analysis/buonomo_fibrosis_", 1:40, "_UMAP.rds")
+
+range <- 1:40
+
+```
+
+
+```{r pressure, echo=FALSE}
+Sce <- list()
+
+for (i in range) {
+  counts <- Read10X(Files[[i]])
+  counts.raw <- Read10X(Raws[[i]])
+  nam <- paste0("bf", i)
+  seurat_object <- CreateSeuratObject(counts = counts, project = nam)
+  seurat_object[["percent.mt"]] <- PercentageFeatureSet(seurat_object, pattern = "^MT-")
+  counts2 <- GetAssayData(object = seurat_object, slot = "counts")
+  sce_counts2 <- SingleCellExperiment(list(counts = counts2))
+  sce.raw <- SingleCellExperiment(list(counts = counts.raw))
+  sce_X <- decontX(sce_counts2, background = sce.raw)
+  seurat_object[["decontXcounts"]] <- CreateAssayObject(counts = decontXcounts(sce_X))
+  DefaultAssay(seurat_object) <- "decontXcounts"
+  Sce[[i]] <- seurat_object
+  assign(nam, Sce[[i]])
+}
+
+
+#Filter
+test_f <- lapply(Sce, subset, subset = nFeature_RNA > 0 & nCount_RNA > 0 & percent.mt < 100)
+
+#SCTransform
+test_sct <- lapply(test_f, SCTransform, vars.to.regress = "percent.mt", verbose = FALSE)
+
+#Run PCA
+test_p <- lapply(test_sct, RunPCA, verbose = FALSE)
+
+#Run UMAP 
+test_u <- lapply(test_p, RunUMAP, dims = 1:30, verbose = FALSE)
+
+#Clustering 
+test_uc <- lapply(test_u, FindNeighbors, dims = 1:30, verbose = FALSE)
+test_uc <- lapply(test_uc, FindClusters, verbose = FALSE)
+
+for (i in range) {
+  saveRDS(test_uc[[i]], file = Destination[i])
+}
+```
+
+All of the UMAP plots 
+```{r pressure, echo=FALSE}
+lapply(test_uc, DimPlot, label = TRUE) 
+```
+
+All of the clustered violin plots 
+```{r pressure, echo=FALSE}
+lapply(test_uc, VlnPlot, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+
+The pre-filtering violin plots 
+```{r pressure, echo=FALSE}
+lapply(Sce, VlnPlot, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+
+The post filtering violin plots
+```{r pressure, echo=FALSE}
+lapply(test_f, VlnPlot, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+
+
+```{r}
+#save.image(file = "./analysis/zhang_fibrosis_Workspace.RData")
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
