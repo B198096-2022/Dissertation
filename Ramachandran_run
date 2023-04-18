@@ -1,0 +1,211 @@
+#Healthy
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170818_HL16_Immune_Uninjured/Data ./ramachandran_healthy_1
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170818_HL16_Endothelial_Uninjured/Data ./ramachandran_healthy_2
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170711_HL16_Mesenchymal_Uninjured/Data ./ramachandran_healthy_3
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171026_HL101_Immune_Uninjured/Data ./ramachandran_healthy_4
+#
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171026_HL101_Immune_Uninjured/Data ./ramachandran_healthy_5
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171026_HL101_Mesenchymal_Uninjured/Data ./ramachandran_healthy_6
+#
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171107_HL103_Myeloid_Uninjured/Data ./ramachandran_healthy_7
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171107_HL103_Endothelial_Uninjured/Data ./ramachandran_healthy_8
+#
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171107_HL103_Mesenchymal_Uninjured/Data ./ramachandran_healthy_9
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL106_Immune_Uninjured/data ./ramachandran_healthy_10
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL106_Endothelial_Uninjured/data ./ramachandran_healthy_11
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL100_Immune_Uninjured/Data ./ramachandran_healthy_12
+
+#Fibrosis
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL39_Immune_Cirrhotic/Data ./ramachandran_fibrosis_1
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL39_Endothelial_Cirrhotic/Data ./ramachandran_fibrosis_2
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL39_Mesenchymal_Cirrhotic/Data ./ramachandran_fibrosis_3
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL62_Immune_Cirrhotic_Ald/data ./ramachandran_fibrosis_4
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL62_Endothelial_Cirrhotic_Ald/data ./ramachandran_fibrosis_5
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180319_HL74_Immune_Cirrhotic_Ald/data ./ramachandran_fibrosis_6
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180319_HL74_Endothelia_Cirrhotic_Ald/data ./ramachandran_fibrosis_7
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170908_HL49_Immune/Data ./ramachandran_fibrosis_8
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170908_HL6_Immune/Data ./ramachandran_fibrosis_9
+
+
+qsub -N mv.rama -cwd -q staging -l h_vmem=32g -V -j y -o . ./rama_mv.sh
+
+rama_mv.sh
+#!bin/bash
+cd /exports/eddie/scratch/s2249132/data/ramachandran
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171107_HL103_Myeloid_Uninjured/Data ./ramachandran_healthy_7
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171107_HL103_Endothelial_Uninjured/Data ./ramachandran_healthy_8
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/171107_HL103_Mesenchymal_Uninjured/Data ./ramachandran_healthy_9
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL106_Immune_Uninjured/data ./ramachandran_healthy_10
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL106_Endothelial_Uninjured/data ./ramachandran_healthy_11
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL100_Immune_Uninjured/Data ./ramachandran_healthy_12
+
+#Fibrosis
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL39_Immune_Cirrhotic/Data ./ramachandran_fibrosis_1
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL39_Endothelial_Cirrhotic/Data ./ramachandran_fibrosis_2
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170725_HL39_Mesenchymal_Cirrhotic/Data ./ramachandran_fibrosis_3
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL62_Immune_Cirrhotic_Ald/data ./ramachandran_fibrosis_4
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180104_HL62_Endothelial_Cirrhotic_Ald/data ./ramachandran_fibrosis_5
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180319_HL74_Immune_Cirrhotic_Ald/data ./ramachandran_fibrosis_6
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/180319_HL74_Endothelia_Cirrhotic_Ald/data ./ramachandran_fibrosis_7
+
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170908_HL49_Immune_Cirrhotic/Data ./ramachandran_fibrosis_8
+cp -r /exports/cmvm/datastore/scs/groups/pramacha-GROUP/data/sequencing/170908_HL6_Immune_Cirrhotic/Data ./ramachandran_fibrosis_9
+
+while read id; do
+  echo stage=0 > params.ramachandran_fibrosis_${id}
+  echo tidy=0 >> params.ramachandran_fibrosis_${id}
+  echo dir=/exports/eddie/scratch/s2249132/data/ramachandran >> params.ramachandran_fibrosis_${id}
+  echo project=ramachandran_fibrosis_${id} >> params.ramachandran_fibrosis_${id}
+  echo n=0 >> params.ramachandran_fibrosis_${id}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.ramachandran_fibrosis_${id}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.ramachandran_fibrosis_${id}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/ramachandran >> params.ramachandran_fibrosis_${id}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.ramachandran_fibrosis_${id}
+done < ramachandran_fibrosis_list.txt
+
+while read id; do
+  echo stage=0 > params.ramachandran_healthy_${id}
+  echo tidy=0 >> params.ramachandran_healthy_${id}
+  echo dir=/exports/eddie/scratch/s2249132/data/ramachandran >> params.ramachandran_healthy_${id}
+  echo project=ramachandran_healthy_${id} >> params.ramachandran_healthy_${id}
+  echo n=0 >> params.ramachandran_healthy_${id}
+  echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.ramachandran_healthy_${id}
+  echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.ramachandran_healthy_${id}
+  echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/ramachandran >> params.ramachandran_healthy_${id}
+  echo srcdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/src >> params.ramachandran_healthy_${id}
+done < ramachandran_healthy_list.txt
+
+#cp ./data/ramachandran/params.ramachandran_healthy* .
+seq 7 12 >> ramachandran_healthy_list.txt
+while read numb; do echo ramachandran_healthy_${numb} >> ramachandran_healthy_files.txt; done < ramachandran_healthy_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < ramachandran_healthy_files.txt
+
+#
+#cp ./data/ramachandran/params.ramachandran_fibrosis* .
+#seq 1 9 >> ramachandran_fibrosis_list.txt
+while read numb; do echo ramachandran_fibrosis_${numb} >> ramachandran_fibrosis_files.txt; done < ramachandran_fibrosis_list.txt
+while read sample; do ./src/submit.jobs.sh ${sample} params.${sample}; done < ramachandran_fibrosis_files.txt
+
+
+
+#Re-run healthy 1 and 2 with multiple samples
+#Healthy 1
+23282_8_AGCCAATT,23282_8_CTAGGTGA,23282_8_GATACGCC,23282_8_TCGTTCAG
+
+
+echo stage=0 > params.ramachandran_healthy_1
+echo tidy=0 >> params.ramachandran_healthy_1
+echo dir=/exports/eddie/scratch/s2249132/data/ramachandran >> params.ramachandran_healthy_1
+echo project=ramachandran_healthy_1 >> params.ramachandran_healthy_1
+echo n=4 >> params.ramachandran_healthy_1
+echo samples=23282_8_AGCCAATT,23282_8_CTAGGTGA,23282_8_GATACGCC,23282_8_TCGTTCAG >> params.ramachandran_healthy_1
+echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.ramachandran_healthy_1
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.ramachandran_healthy_1
+echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/ramachandran >> params.ramachandran_healthy_1
+echo srcdir=/exports/eddie/scratch/s2249132/src >> params.ramachandran_healthy_1
+
+
+#Healthy 2
+23282_7_AAACCGAG,23282_7_CGCTATGT,23282_7_GCTGTCCA,23282_7_TTGAGATC
+
+echo stage=0 > params.ramachandran_healthy_2
+echo tidy=0 >> params.ramachandran_healthy_2
+echo dir=/exports/eddie/scratch/s2249132/data/ramachandran >> params.ramachandran_healthy_2
+echo project=ramachandran_healthy_1 >> params.ramachandran_healthy_2
+echo n=4 >> params.ramachandran_healthy_2
+echo samples=23282_7_AAACCGAG,23282_7_CGCTATGT,23282_7_GCTGTCCA,23282_7_TTGAGATC >> params.ramachandran_healthy_2
+echo ref=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/references/refdata-gex-GRCh38-2020-A/ >> params.ramachandran_healthy_2
+echo logdir=/exports/cmvm/eddie/scs/groups/pramacha-GROUP/max/cellranger/logs >> params.ramachandran_healthy_2
+echo destination=/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/ramachandran >> params.ramachandran_healthy_2
+echo srcdir=/exports/eddie/scratch/s2249132/src >> params.ramachandran_healthy_2
+
+#Then run them
+seq 1 2 >> ramachandran_healthy_list.txt
+while read numb; do echo ramachandran_healthy_${numb} >> ramachandran_healthy_files.txt; done < ramachandran_healthy_list.txt
+while read sample; do ./src/submit.rama1_2.sh ${sample} params.${sample}; done < ramachandran_healthy_files.txt
+
+#Note, I changed the srcdir and wrote new submit and call scripts (submit.rama1_2.sh and call_r.sh)
+
+submit.rama1_2.
+#!/bin/bash
+#It is the same as submit.jobs.sh
+#except I changed the name of the call script to the new call_r.sh
+if [ $# -lt 2 ]; then
+  echo "Invalid arguments supplied"
+  echo "Script usage: 'submit.jobs.sh <job.id> <parameters.file>'"
+  exit 0
+
+else
+  jid=$1
+  parameters=$2
+fi
+
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+if [ ${stage} -eq 1 ]; then
+  qsub -N cp.${jid} -cwd -q staging -V -v parameters=${parameters} -j y -o ${logdir}/ ${srcdir}/cp.datastore.sh
+fi
+#The only change is the calls script name
+qsub -N call.${jid} -hold_jid cp.${jid} -cwd -l h_vmem=32g -V -v parameters=${parameters} -j y -o ${logdir}/ ${srcdir}/call_r.sh
+qsub -N tidy.${jid} -hold_jid call.${jid} -cwd -q staging -V -v parameters=${parameters} -j y -o ${logdir}/ ${srcdir}/tidy.datastore.sh
+
+#######################################################################
+#Then here is the call_r.sh script
+call_r.sh
+#!/bin/bash
+
+#Identical to call.sh except I removed juliet's command for naming samples
+#I hard coded the sample names for these two patients
+while IFS='=' read -a pArray; do
+  p=${pArray[0]}
+  declare ${p}="${pArray[1]}"
+done < ${parameters}
+
+module load igmm/apps/cellranger/7.0.0
+
+#I just commented out the sample naming loop since
+#I already did that manually in the params file
+if [ ${n} -gt 0 ]; then
+  #samples="${pref}-1"; for i in `seq 2 ${n}`; do samples="${samples},${pref}-${n}"; done
+  cd ${dir}
+  cellranger count --id=${project}_output \
+    --transcriptome=${ref} \
+    --fastqs=${dir}/${project} \
+    --sample=${samples}
+
+else
+  cd ${dir}
+  cellranger count --id=${project}_output \
+    --transcriptome=${ref} \
+    --fastqs=${dir}/${project}
+fi
