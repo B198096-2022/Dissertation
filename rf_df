@@ -98,7 +98,7 @@ for (i in range){
   df_col[[i]] <- paste0("DF.classifications_0.25_",pK[[i]],"_",nExp_poi[[i]])
   DimPlot(sce_list[[i]], reduction = 'umap', group.by = df_col[[i]])
   for (i in range){
-  saveRDS(sce_list[[i]], file = paste0(dir,"ramachandran_fibrosis_cell_",i,"_QC.rds"))
+  saveRDS(sce_list[[i]], file = paste0(dir,"ramachandran_fibrosis_cell_",i,"_DF.rds"))
 } 
 }
 ```
