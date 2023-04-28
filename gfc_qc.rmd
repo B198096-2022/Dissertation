@@ -1,0 +1,178 @@
+---
+title: "gfc_qc"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+## Setup environment and load required packages
+```{r}
+#create list of packages to load
+#install.packages('SoupX') 
+#install.packages('bigutilsr')
+load_pkg <- rlang::quos(Seurat, #scRNA-seq wrapper
+scater, #scRNA-seq QC
+SoupX, #ambient RNA removal
+bigutilsr, #PCA outlier detection
+ggplot2, #visualisation
+dplyr
+)
+#load packages
+invisible(lapply(lapply(load_pkg, rlang::quo_name),
+library,
+character.only = TRUE
+))
+```
+
+## Load in data and specify parameters
+```{r, initialize}
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis")
+
+rf_cells <- list()
+sce_list <- list()
+fig_lab <- "gfc"
+range <- 1:6
+dir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis/"
+fig_path <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis/"
+files <- paste0(dir,"guilliams_fibrosis_cell_",range,"_UMAP.rds")
+output <- paste0(dir,"guilliams_fibrosis_cell_",range,"_QC.rds")
+for (i in range){
+  sce_list[i] <- test_uc[[i]]
+} 
+
+
+#Save the unfiltered dimensions for expectd doublet values
+for (i in range){
+  rf_cells[[i]] <- ncol(sce_list[[i]])
+}
+saveRDS(rf_cells, file = paste0(dir,fig_lab,"_unfiltered_dim.rds"))
+
+
+```
+
+## Filter for mt% above 20 and count/feature below 3 nmad 
+```{r, mt and count filter}
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis")
+filtered_sizes <- c()
+
+for (i in range){
+  #Store the raw unfiltered size
+  filtered_sizes <- c(filtered_sizes, paste0(fig_lab,i,"_raw"))
+  filtered_sizes <- c(filtered_sizes, ncol(sce_list[[i]]))
+  #Remove mt% above 0.2
+  sce_list[[i]] <- subset(sce_list[[i]], subset = percent.mt < 20)
+  sce <- as.SingleCellExperiment(sce_list[[i]])
+  #Store the mt filtered size
+  filtered_sizes <- c(filtered_sizes, paste0(fig_lab,i,"_mt"))
+  dim(sce)
+  filtered_sizes <- c(filtered_sizes, dim(sce)[2])
+  #Calculate outliers
+  sce <- addPerCellQC(sce, subsets=list(mito=grep("^MT-", rownames(sce))))
+  count_outlier <- isOutlier(sce$detected, nmads=3, type="lower", log=TRUE, batch = sce$broad_enrichment)
+  detected_outlier <- isOutlier(sce$sum, nmads=3, type="lower", log=TRUE, batch = sce$broad_enrichment)
+  sce$count_outlier <- count_outlier
+  sce$detected_outlier <- detected_outlier
+  sce$final_outlier <- count_outlier | detected_outlier
+  #plot QC outliers
+  fig1_name = paste0("sum_detected_scatter_by_counts_outlier_",fig_lab,i,".pdf")
+  plt <- plotColData(sce, x = "sum", y="detected", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = plt)
+  plt
+  #remove QC outliers
+  sce <- sce[,which(!sce$final_outlier)]
+  filtered_sizes <- c(filtered_sizes, paste0(fig_lab,i,"_count"))
+  dim(sce)
+  filtered_sizes <- c(filtered_sizes, dim(sce)[2])
+  #Update the seurat objects
+  sce_list[[i]] <- subset(sce_list[[i]], cells = colnames(sce))
+}
+
+saveRDS(filtered_sizes, file = paste0(dir,fig_lab,"_filtered_dims.rds"))
+for (i in range){
+  saveRDS(sce_list[[i]], file = output[[i]])
+} 
+```
+
+## Filter for upper bound expression outliers 
+##The remaining blocks don't run
+## To run the remaining blocks change the "eval=FALSE" to "eval=TRUE"
+```{r, expression outliers, eval=FALSE}
+#Quickly make a list with shifted indexing for the merge function
+sce_list_t <- list()
+for (i in range){
+  if (i != 1){
+    m = i - 1
+    sce_list_t[[m]] <- sce_list[[i]]
+  }
+}
+
+#And make a list of cell.ids to split the individual samples after this step
+cell.ids <- paste0(fig_lab,range)
+
+#Create one large merged seurat object
+object_merged <- merge(sce_list[[1]], y = sce_list_t, add.cell.ids = cell.ids, project = paste0(fig_lab,"_merged_QC"))
+
+#determine expression outliers
+#Set the default assay back to decontXcounts and normalize the entire merged object 
+#This is necessary for the VariableFeatures() function 
+DefaultAssay(object_merged) <- "decontXcounts"
+object_merged <- NormalizeData(object_merged)
+#Find the variable features 
+VariableFeatures(object_merged) <- SelectIntegrationFeatures(lapply(X = SplitObject(object_merged, split.by = "orig.ident"), FUN = function(x) {x <- FindVariableFeatures(x, verbose = F)}))
+#Scale the data and run PCA
+object_merged <- object_merged %>%
+ScaleData() %>%
+RunPCA()
+#Then label expression outliers 
+x <- as.matrix(object_merged[["pca"]]@cell.embeddings)
+y <- LOF(x, log = F, ncores = 8)
+outliers <- isOutlier(y, log = T, type = "higher")
+object_merged$expression_outliers <- outliers
+
+#remove expression outliers
+dim(object_merged)
+object_merged <- subset(object_merged, expression_outliers == FALSE)
+dim(object_merged)
+```
+
+
+
+
+## Remove weakly expressed genes 
+```{r, remove weak genes (if merged object),eval=FALSE }
+#remove weakly expressed genes
+counts <- GetAssayData(object = object_merged, slot = "counts")
+nonzero <- counts > 0
+keep_genes <- Matrix::rowSums(nonzero) > 3
+removed_genes <- setdiff(rownames(object_merged2), names(keep_genes))
+filtered_counts <- counts[keep_genes, ]
+#Form a new seurat object using this filtered counts matrix
+object_merged2 <- CreateSeuratObject(filtered_counts, meta.data = object_merged@meta.data)
+
+#Split the merged object back into individual seurat objects 
+for (i in range){
+  sce_list[[i]] <- subset(object_merged2, subset = orig.ident == paste0(fig_lab,i))
+}
+
+saveRDS(filtered_sizes, file = paste0(dir,"rf_filtered_dims"))
+```
+
+```{r, remove weak genes (without merging), eval=FALSE}
+ranget <- 8:9
+for (i in ranget){
+  counts <- GetAssayData(object = sce_list[[i]], slot = "counts")
+  nonzero <- counts > 0
+  keep_genes <- Matrix::rowSums(nonzero) > 3
+  removed_genes <- setdiff(rownames(sce_list[[i]]), names(keep_genes))
+  filtered_counts <- counts[keep_genes, ]
+  sce_list[[i]] <- CreateSeuratObject(filtered_counts, meta.data = sce_list[[i]]@meta.data)
+}
+saveRDS(filtered_sizes, file = paste0(dir,"rf_filtered_dims"))
+```
+
