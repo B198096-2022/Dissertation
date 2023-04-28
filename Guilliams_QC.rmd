@@ -1,0 +1,100 @@
+---
+title: "Guilliams_hc_QC_Filter"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+## Setup environment and load required packages
+```{r}
+#create list of packages to load
+#install.packages('SoupX')
+#install.packages('bigutilsr')
+load_pkg <- rlang::quos(Seurat, #scRNA-seq wrapper
+scater, #scRNA-seq QC
+SoupX, #ambient RNA removal
+bigutilsr, #PCA outlier detection
+ggplot2, #visualisation
+dplyr
+)
+#load packages
+invisible(lapply(lapply(load_pkg, rlang::quo_name),
+library,
+character.only = TRUE
+))
+```
+
+## Load in data and specify parameters
+```{r, initialize}
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis")
+
+rf_cells <- list()
+sce_list <- list()
+fig_lab <- "ghc"
+range <- 1:4
+dir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis/"
+fig_path <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/analysis/"
+files <- paste0(dir,"guilliams_healthy_cell_",range,"_UMAP.rds")
+output <- paste0(dir,"guilliams_healthy_cell_",range,"_QC.rds")
+for (i in range){
+  sce_list[i] <- readRDS(file = files[[i]])
+} 
+
+
+#Save the unfiltered dimensions for expectd doublet values
+for (i in range){
+  rf_cells[[i]] <- ncol(sce_list[[i]])
+}
+saveRDS(rf_cells, file = paste0(dir,fig_lab,"_unfiltered_dim.rds"))
+
+
+```
+
+## Filter for mt% above 20 and count/feature below 3 nmad 
+```{r, mt and count filter}
+filtered_sizes <- c()
+
+for (i in range){
+  #Store the raw unfiltered size
+  filtered_sizes <- c(filtered_sizes, paste0(fig_lab,i,"_raw"))
+  filtered_sizes <- c(filtered_sizes, ncol(sce_list[[i]]))
+  #Remove mt% above 0.2
+  sce_list[[i]] <- subset(sce_list[[i]], subset = percent.mt < 20)
+  sce <- as.SingleCellExperiment(sce_list[[i]])
+  #Store the mt filtered size
+  filtered_sizes <- c(filtered_sizes, paste0(fig_lab,i,"_mt"))
+  dim(sce)
+  filtered_sizes <- c(filtered_sizes, dim(sce)[2])
+  #Calculate outliers
+  sce <- addPerCellQC(sce, subsets=list(mito=grep("^MT-", rownames(sce))))
+  count_outlier <- isOutlier(sce$detected, nmads=3, type="lower", log=TRUE, batch = sce$broad_enrichment)
+  detected_outlier <- isOutlier(sce$sum, nmads=3, type="lower", log=TRUE, batch = sce$broad_enrichment)
+  sce$count_outlier <- count_outlier
+  sce$detected_outlier <- detected_outlier
+  sce$final_outlier <- count_outlier | detected_outlier
+  #plot QC outliers
+  fig1_name = paste0("sum_detected_scatter_by_counts_outlier_",fig_lab,i,".pdf")
+  plt <- plotColData(sce, x = "sum", y="detected", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = plt)
+  plt
+  #remove QC outliers
+  sce <- sce[,which(!sce$final_outlier)]
+  filtered_sizes <- c(filtered_sizes, paste0(fig_lab,i,"_count"))
+  dim(sce)
+  filtered_sizes <- c(filtered_sizes, dim(sce)[2])
+  #Update the seurat objects
+  sce_list[[i]] <- subset(sce_list[[i]], cells = colnames(sce))
+}
+
+#Then save the final seurat objects and the filtered count numbers
+saveRDS(filtered_sizes, file = paste0(dir,fig_lab,"_filtered_dims.rds"))
+for (i in range){
+  saveRDS(sce_list[[i]], file = output[[i]])
+} 
+```
