@@ -288,8 +288,9 @@ object_merged <- merge(Sce[[1]], y = sce_list_t, add.cell.ids = cell.ids, projec
 #Add a column in the meta data to specify where the sample came from 
 experiment_group <- list()
 for (i in ncol(object_merged)){
-  experiment_label <- c(experiment_group, sample_label)
+  experiment_group <- c(experiment_group, sample_label)
 }
+#@meta.data
 object_merged$exp_group <- experiment_group
 
 #rename the merged object based on the sample label
@@ -299,6 +300,7 @@ assign(merged_name, object_merged)
 
 ## Visualize unintegrated data for single experiment 
 ```{r, visualize exp merge}
+DefaultAssay(object_merged) <- "decontXcounts"
 object_merged <- NormalizeData(object_merged)
 object_merged <- FindVariableFeatures(object_merged)
 object_merged <- ScaleData(object_merged)
