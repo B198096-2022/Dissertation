@@ -1,0 +1,391 @@
+---
+title: "Updated_Pipeline"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+## Setup Environment 
+```{r setup}
+#smb://cmvm.datastore.ed.ac.uk/cmvm/scs/Groups/pramacha-GROUP
+#setup libraries and cwd
+#BiocManager::install("celda")
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(sctransform)
+library(celda)
+library(DoubletFinder)
+library(DoubletFinder)
+#https://github.com/chris-mcginnis-ucsf/DoubletFinder
+library(tidyverse)
+library(ggplot2)
+
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer")
+```
+
+## Step 1 : Specify the data sets you want processed  
+
+```{r, specify data}
+
+#Specify the files you want to run 
+#For trial run
+#ZHC 11 and 12
+#ZFC 6 and 7
+#GHC 2 and 4
+#GFC 1 and 6
+range <- 1:2
+sample_author <- "guilliams"
+sample_name <- "guilliams_fibrosis_cell_"
+sample_label <- "gfc"
+datadir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/"
+outdir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/QC/"
+
+#Specify desired filtering parameters 
+mt_cutoff <- 30
+nfeature_cutoff <- 100
+ncount_cutoff <- 0
+
+for (i in range){
+  Files[[i]] <- paste0(datadir,sample_author,"/",sample_name, i,"/outs/filtered_feature_bc_matrix/")
+  Raws[[i]] <- paste0(datadir,sample_author,"/",sample_name, i, "/outs/raw_feature_bc_matrix/")
+  Destination[[i]] <- paste0(outdir,sample_name,i,"_UMAP.rds")
+}
+
+
+#Files <- paste0(datadir,sample_author,"/",sample_name, range,"/outs/filtered_feature_bc_matrix/")
+#Raws <- paste0(datadir,sample_author,"/",sample_name, range, "/outs/raw_feature_bc_matrix/")
+#Destination <- paste0(outdir,sample_name,range,"_UMAP.rds")
+
+```
+
+
+## Step 2 Load in data and create seurat objects 
+
+```{r, load data}
+setwd(datadir)
+Sce <- list()
+
+#Read in data create SeuratObjects  
+for (i in range) {
+  counts <- Read10X(Files[[i]])
+  nam <- paste0(sample_label, i)
+  seurat_object <- CreateSeuratObject(counts = counts, project = nam)
+  seurat_object[["percent.mt"]] <- PercentageFeatureSet(seurat_object, pattern = "^MT-")
+  #These were the decontX steps, performed later 
+  #counts.raw <- Read10X(Raws[[i]])
+  #counts2 <- GetAssayData(object = seurat_object, slot = "counts")
+  #sce_counts2 <- SingleCellExperiment(list(counts = counts2))
+  #sce.raw <- SingleCellExperiment(list(counts = counts.raw))
+  #sce_X <- decontX(sce_counts2, background = sce.raw)
+  #seurat_object[["decontXcounts"]] <- CreateAssayObject(counts = decontXcounts(sce_X))
+  #DefaultAssay(seurat_object) <- "decontXcounts"
+  Sce[[i]] <- seurat_object
+  assign(nam, Sce[[i]])
+}
+
+
+```
+
+## Step 3 QC Threshold Filtering 
+```{r, filter}
+#Filter step
+
+#If repeating this step, set filter_round to whatever round of filtering this is 
+filter_round <- c()
+#If setting new threshold values specify here 
+#mt_cutoff <- 30
+#nfeature_cutoff <- 100
+#ncount_cutoff <- 0
+
+unfiltered_counts <- list()
+filtered_sizes <- list()
+
+for (i in range){
+  #Store the raw cell counts
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_raw_cells",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+  unfiltered_counts <- c(unfiltered_counts, ncol(Sce[[i]]))
+  #Filter for mt% based on specified cutoff 
+  Sce[[i]] <- subset(Sce[[i]], subset = percent.mt < mt_cutoff)
+  #Save new cell counts after mt filtering
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_mt_filtered",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+  #Filter for nFeature based on specified cutoff
+  Sce[[i]] <- subset(Sce[[i]], subset = nFeature_RNA > nfeature_cutoff)
+  #Save new cell counts after mt filtering
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_nFeature_filtered",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+  #Filter for nCount based on specified cutoff
+  Sce[[i]] <- subset(Sce[[i]], subset = nCount_RNA > ncount_cutoff)
+  #Save new cell counts after mt filtering
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_nCount_filtered",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+}
+
+#Save the filtered cell counts
+saveRDS(filtered_sizes, file = paste0(outdir,sample_label,"_filtered",filter_round,"_dims.rds"))
+
+
+```
+
+## Step 4 Remove Ambient RNA
+```{r, DecontX}
+for (i in range){
+  #If re-running this step later, must set assay back to "raw" RNA  
+  DefaultAssay(Sce[[i]]) <- "RNA"
+  counts.raw <- Read10X(Raws[[i]])
+  counts2 <- GetAssayData(object = Sce[[i]], slot = "counts")
+  sce_counts2 <- SingleCellExperiment(list(counts = counts2))
+  sce.raw <- SingleCellExperiment(list(counts = counts.raw))
+  sce_X <- decontX(sce_counts2, background = sce.raw)
+  Sce[[i]][["decontXcounts"]] <- CreateAssayObject(counts = decontXcounts(sce_X))
+  DefaultAssay(Sce[[i]]) <- "decontXcounts"
+}
+```
+
+
+## Step 5 Normalize, Scale, and Run PCA
+```{r, Normalize/Scale/PCA}
+for (i in range){
+  #Normalize Data (Defaults are Log Normalization with Scale Factor 10,000)
+  Sce[[i]] <- NormalizeData(Sce[[i]])
+  #Label Variable Features for future analysis and PCA
+  Sce[[i]] <- FindVariableFeatures(Sce[[i]], selection.method = "vst", nfeatures = 2000)
+  #Scale Data
+  all.genes <- rownames(Sce[[i]])
+  Sce[[i]] <- ScaleData(Sce[[i]], features = all.genes)
+  #Run PCA
+  Sce[[i]] <- RunPCA(Sce[[i]], features = VariableFeatures(object = Sce[[i]]))
+  #Run UMAP
+  Sce[[i]] <- RunUMAP(Sce[[i]], dims = 1:30, verbose = FALSE)
+}
+```
+
+#For trial run
+#count <- 0
+#temp <- list()
+#for (i in range){
+#  count = count + 1
+#  print(count)
+#  temp[[i]] <- unfiltered_counts[[count]]
+#}
+
+
+#unfiltered_counts <- temp
+
+
+#Step 6 SCTransform 
+```{r}
+
+#Run SCTransform
+for (i in range){
+  Sce[[i]] <- SCTransform(Sce[[i]], vars.to.regress = "percent.mt", verbose = FALSE)
+}
+
+```
+
+
+## Step 7 DoubletFinder
+```{r, DoubletFinder}
+
+#The first step of DoubletFinder is calculating expected doublets for each sample 
+#This loop determines this for each sample based on raw returned cells 
+
+exp_d <- list()
+for (i in range){
+  #Total cells recovered 
+  cells <- unfiltered_counts[[i]]
+  #10x calcualtes expected doublets as a function of number of recovered cells 
+  #Their table is for brackets of 1000 cells, so I am setting the boundries at 500 cells 
+  #So that the bracket used is whatever 1000s is closest 
+  bracket <- as.integer(cells/1000)
+  bracket_up <- cells%%1000
+  #Then this is a conditional to assign expected doublet rate   
+  #Based on the bracket information 
+  if (cells < 500) {
+    exp_d[[i]] <- 0.004
+    } else {
+      exp_d[[i]] <- 0.008 * bracket
+      if (bracket_up > 500) {
+        exp_d[[i]] <- 0.008 * (bracket + 1)
+      }
+    }
+}
+
+
+#Then Run DoubletFinder, which will label expected doublets  
+
+pK <- list()
+nExp_poi <- list()
+nExp_poi.adj <- list()
+df_col <- list()
+for (i in range ){
+  #This simulates various pK values for this data to identify the optimal value 
+  #I am specifying that 30 PCs were used in the original PCA (I could change 
+  #This for the DF analysis, but choosing to use all PCs)
+  #And specifying that I used SCTransform 
+  sweep.res.list_tf1 <- paramSweep_v3(Sce[[i]], PCs = 1:30, sct = TRUE)
+  #Generates a summary table of the above simultions. 
+  #No multiplexed data so GT is false 
+  sweep.stats_tf1 <- summarizeSweep(sweep.res.list_tf1, GT = FALSE)
+  #Then this calculates BC metrics as a score of success for each pK value 
+  bcmvn_tf1 <- find.pK(sweep.stats_tf1)
+  #This goes through and pulls the optimal pK value after the simulations 
+  pK_temp <- bcmvn_tf1 %>%
+    filter(BCmetric == max(BCmetric)) %>%
+    select(pK)
+  pK[[i]] <- as.numeric(as.character(pK_temp[[1]]))
+  #Adding the annotations of cluster results from the PCA 
+  annotations <- Sce[[i]]@meta.data$ClusteringResults
+  #Modelling homotypic doublets based on clustering patterns 
+  homotypic.prop <- modelHomotypic(annotations)
+  #Predicting the number of expected doublets based on exp_d from above 
+  nExp_poi[[i]] <- round(exp_d[[i]]*nrow(Sce[[i]]@meta.data))  
+  #Adjusting the total expected doublet count
+  nExp_poi.adj[[i]] <- round(nExp_poi[[i]]*(1-homotypic.prop))
+  #Running DoubletFinder 
+  #I am setting PCs to 30 again 
+  #The developers found that results are not significantly impacted by pN 
+  #And so I followed their default value of 0.25 
+  #pK and nExp are calculated above 
+  #reuse.pANN is not being used, and SCTransform was used
+  Sce[[i]] <- doubletFinder_v3(Sce[[i]], PCs = 1:30, pN = 0.25, pK = pK[[i]], nExp = nExp_poi[[i]], reuse.pANN = FALSE, sct = TRUE)
+  #Sce[[i]] <- doubletFinder_v3(Sce[[i]], PCs = 1:30, pN = 0.25, pK = pK[[i]], nExp = nExp_poi.adj[[i]], reuse.pANN = paste0("pANN_0.25_",pK[[i]],"_",nExp_poi[[i]]), sct = FALSE)
+  df_col[[i]] <- paste0("DF.classifications_0.25_",pK[[i]],"_",nExp_poi[[i]])
+  DimPlot(Sce[[i]], reduction = 'umap', group.by = df_col[[i]])
+}
+
+
+```
+
+
+
+
+#Step 9 Merge the samples for one experiment  
+```{r}
+#Quickly make a list with shifted indexing for the merge function
+sce_list_t <- list()
+for (i in range){
+  if (i != 1){
+    m = i - 1
+    sce_list_t[[m]] <- Sce[[i]]
+  }
+}
+
+#And make a list of cell.ids to split the individual samples after this step
+cell.ids <- paste0(sample_label,range)
+
+#Create one large merged seurat object
+object_merged <- merge(Sce[[1]], y = sce_list_t, add.cell.ids = cell.ids, project = paste0(sample_label,"_merged"))
+
+#Add a column in the meta data to specify where the sample came from 
+experiment_group <- list()
+for (i in ncol(object_merged)){
+  experiment_label <- c(experiment_group, sample_label)
+}
+object_merged$exp_group <- experiment_group
+
+#rename the merged object based on the sample label
+merged_name <- paste0(sample_label,"_merged")
+assign(merged_name, object_merged)
+```
+
+## Visualize unintegrated data for single experiment 
+```{r, visualize exp merge}
+object_merged <- NormalizeData(object_merged)
+object_merged <- FindVariableFeatures(object_merged)
+object_merged <- ScaleData(object_merged)
+#Can do SCT instead if desired
+#object_merged <- SCTransform(object_merged)
+object_merged <- RunPCA(object_merged)
+object_merged <- FindNeighbors(object_merged, dims = 1:30, reduction = "pca")
+object_merged <- FindClusters(object_merged, resolution = 2, cluster.name = "unintegrated_clusters")
+
+object_merged <- RunUMAP(object_merged, dims = 1:30, reduction = "pca", reduction.name = "umap.unintegrated")
+
+fig_name <- paste0(sample_name,"merged_umap.pdf")
+plt <- DimPlot(object_merged, reduction = "umap.unintegrated", group.by = c("orig.ident"))
+ggsave(filename = paste0(outdir, fig_name), plot = plt)
+plt
+
+#Then this will loop through and use the df_col names
+#Which are the metadata columns with the DoubletFinder results for each sample
+#And merge these results into a single metadata column for Doublets
+for (i in range){
+  df_label <- df_col[[i]]
+  #Paste a string of the full name of the metadata column
+  meta_col <- paste0("object_merged@meta.data$",df_label)
+  remove_col <- paste0(meta_col," <- NULL")
+  #then use eval(parse(text=)) to execute the string 
+  col <- eval(parse(text=meta_col))
+  #Now loop through every row and of this column 
+  #And report doublet or single (or just leave blank) in combined column
+  for (i in 1:ncol(object_merged)){
+    if(is.na(col[[i]])) {
+    col[[i]]="Other"
+    }
+    if (col[[i]] == "Singlet"){
+    object_merged@meta.data$doublets[[i]] <- "Singlet"
+    }
+    if (col[[i]] == "Doublet"){
+    object_merged@meta.data$doublets[[i]] <- "Doublet"
+    #And loop through for the DF column for each sample 
+  #Then at the end, remove the DF column to clean up metadata
+  eval(parse(text=meta_col))
+}
+}
+}
+
+temp <- c()
+for (i in 1:ncol(object_merged)){
+  temp <- c(temp, object_merged@meta.data$doublets[[i]])
+}
+object_merged@meta.data$doublets <- temp
+
+fig_name <- paste0(sample_name,"merged_doublets.pdf")
+plt2 <- DimPlot(object_merged, reduction = "umap.unintegrated", group.by = c("doublets"))
+ggsave(filename = paste0(outdir, fig_name), plot = plt2)
+plt2
+
+
+#rename the merged object based on the sample label
+merged_name <- paste0(sample_label,"_merged")
+assign(merged_name, object_merged)
+
+#Save the merged object
+saveRDS(object_merged, file = paste0(outdir,sample_label,"_merged_object.rds"))
+
+```
+
+
+## Time to integrate
+
+
+#Step 10 Merge Different Experiments Together  
+```{r}
+#Specify 
+#all_merged <- merge(zh_merged, y = c(zf_merged, bh_merged, bf_merged), project = "total_merged")
+
+#Run SCT on the full merged data set 
+```
+
+## Step 11 Integration with scVI
+
+
+
+
+
+
+
+
+
+
+
+
