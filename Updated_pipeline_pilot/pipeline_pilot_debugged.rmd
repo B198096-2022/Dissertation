@@ -352,7 +352,7 @@ for (i in range){
     object_merged@meta.data$doublets[[i]] <- "Doublet"
     #And loop through for the DF column for each sample 
   #Then at the end, remove the DF column to clean up metadata
-  eval(parse(text=meta_col))
+  eval(parse(text=remove_col))
 }
 }
 }
