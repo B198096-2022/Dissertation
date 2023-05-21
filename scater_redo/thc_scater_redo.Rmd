@@ -50,6 +50,10 @@ Sce <- list()
 #set the desired nmads to use for filtering 
 nmad <- 3
 mt_nmad <- 3
+#Do you want to remove the labeled outliers?
+#If FALSE then outliers are labeled but not removed
+#If TRUE then outliers are removed 
+remove <- "FALSE"
 
 range <- 1:2
 #Specify the author of the data set for labeling, example: "zhang" 
@@ -61,10 +65,16 @@ sample_name <- "tamburini_healthy_"
 sample_label <- "thc"
 fig_lab <- "thc"
 
+#Where to find the cell ranger outputs 
 dir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/"
 datadir <- dir
+
+#Where to save the final object to
 outdir <- paste0("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/scater/",sample_author,"/")
+#Where to save the plots to
 fig_path <- paste0("~/Desktop/scater/",sample_author,"/")
+#Where to save the outlier labels to 
+label_dir <- paste0(outdir,"outlier_labels/")
 
 
 Files <- list()
@@ -74,6 +84,20 @@ for (i in range){
   Files[[i]] <- paste0(datadir,sample_author,"/",sample_name, i,"/outs/filtered_feature_bc_matrix/")
   Raws[[i]] <- paste0(datadir,sample_author,"/",sample_name, i, "/outs/raw_feature_bc_matrix/")
   Destination[[i]] <- paste0(outdir,sample_name,i,"_UMAP.rds")
+}
+
+
+#If the destination directories don't exist, make them 
+if (!dir.exists(outdir)){
+  dir.create(outdir)
+}
+
+if (!dir.exists(fig_path)){
+  dir.create(fig_path)
+}
+
+if (!dir.exists(label_dir)){
+  dir.create(label_dir)
 }
 
 ```
@@ -138,7 +162,7 @@ for (i in range) {
 
 
 
-## Filter for mt%/count/feature past 3 nmad 
+## Filter for mt%/count/feature past 3 nmad (or otherwise specified above)
 ```{r, mt and count filter}
 filtered_sizes <- list()
 NSce <- list()
@@ -208,6 +232,19 @@ for (i in range){
   Sce[[i]]$detected_outlier <- detected_outlier
   Sce[[i]]$mt_outlier <- mt_outlier
   Sce[[i]]$final_outlier <- count_outlier | detected_outlier | mt_outlier
+  final_outlier <- count_outlier | detected_outlier | mt_outlier
+  #Save the outlier labels in case I want to use them later 
+  saveRDS(count_outlier, file = paste0(label_dir,fig_lab,i,"_scater_count_outlier.rds"))
+  saveRDS(detected_outlier, file = paste0(label_dir,fig_lab,i,"_scater_detected_outlier.rds"))
+  saveRDS(mt_outlier, file = paste0(label_dir,fig_lab,i,"_scater_mt_outlier.rds"))
+  saveRDS(final_outlier, file = paste0(label_dir,fig_lab,i,"_scater_final_outlier.rds"))
+  #Specific for this run! Also adding the mt < 30 and nFeature > 100 cutoff
+  #So that I can just add these columns to the hard-filter object if wanted
+  sub <- subset(Sce[[i]], subset = nFeature_RNA > 100 & percent.mt < 30)
+  saveRDS(sub$count_outlier, file = paste0(label_dir,fig_lab,i,"_scater_count_outlier_100-30_filtered.rds"))
+  saveRDS(sub$detected_outlier, file = paste0(label_dir,fig_lab,i,"_scater_detected_outlier100-30_filtered.rds"))
+  saveRDS(sub$mt_outlier, file = paste0(label_dir,fig_lab,i,"_scater_mt_outlier100-30_filtered.rds"))
+  saveRDS(sub$final_outlier, file = paste0(label_dir,fig_lab,i,"_scater_final_outlier100-30_filtered.rds"))
 }
 
 saveRDS(filtered_sizes, file = paste0(outdir,fig_lab,"_scater_filtered_dims.rds"))
@@ -216,6 +253,18 @@ saveRDS(raw_counts, file = paste0(outdir,fig_lab,"_raw_counts.rds"))
 #for (i in range){
 #  saveRDS(Sce[[i]], file = paste0(outdir,fig_lab,i,"_scater_object_rds"))
 #} 
+```
+
+## Save violin plots for each of the filter criteria 
+```{r}
+#vln plot
+for (i in range){
+  sub <- subset(Sce[[i]], final_outlier == "FALSE")
+  vln <- VlnPlot(sub, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+  fig1_name = paste0(fig_lab,i,"_vln_sacter_filtered.pdf")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = vln)
+  vln
+}
 ```
 
 ## Add Meta Data and save 
@@ -227,21 +276,16 @@ for (i in range){
   Sce[[i]]$aetiology <- aetiology[[i]]
   Sce[[i]]$fibrosis_score <- fibrosis_score[[i]]
   Sce[[i]]$fibrosis_stage <- fibrosis_stage[[i]]
+  #If remove is set to TRUE the outliers are removed before saving
+  if (remove == "TRUE"){
+    Sce[[i]] <- subset(Sce[[i]], final_outlier == "FALSE")
+  }
   saveRDS(Sce[[i]], file = paste0(outdir,fig_lab,i,"_scater_object.rds"))
 }
 ```
 
-## Save violin plots for each of the filter criteria 
-```{r}
-#vln plot
-for (i in range){
-  sub <- subset(Sce[[1]], final_outlier == "FALSE")
-  vln <- VlnPlot(sub, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-  fig1_name = paste0(fig_lab,i,"_vln_sacter_filtered.pdf")
-  ggsave(filename = paste0(fig_path, fig1_name), plot = vln)
-  vln
-}
-```
+
+
 
 ## Filter for upper bound expression outliers 
 ##The remaining blocks don't run
