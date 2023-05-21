@@ -1,0 +1,428 @@
+---
+title: "bhc_scater_redo"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer")
+```
+
+## R Markdown
+
+## Setup environment and load required packages
+```{r}
+#create list of packages to load
+#install.packages('SoupX')
+#install.packages('bigutilsr')
+
+old_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/old-versions"
+
+#Then I used the below commands to install the old Seurat and SeuratObject 
+#install_version("Seurat", version = "4.3", lib = old_lib)
+#install_version("SeuratObject", version = "4.1.3", lib = old_lib)
+library("SeuratObject", lib.loc = old_lib)
+library("Seurat", lib.loc = old_lib)
+library(celda)
+
+load_pkg <- rlang::quos(scater, #scRNA-seq QC
+SoupX, #ambient RNA removal
+bigutilsr, #PCA outlier detection
+ggplot2, #visualisation
+dplyr
+)
+#load packages
+invisible(lapply(lapply(load_pkg, rlang::quo_name),
+library,
+character.only = TRUE
+))
+
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer")
+```
+
+## Load in data and specify parameters
+```{r, initialize}
+rf_cells <- list()
+Sce <- list()
+
+#set the desired nmads to use for filtering 
+nmad <- 3
+mt_nmad <- 3
+#Do you want to remove the labeled outliers?
+#If FALSE then outliers are labeled but not removed
+#If TRUE then outliers are removed 
+remove <- "FALSE"
+
+range <- 1:52
+#Specify the author of the data set for labeling, example: "zhang" 
+sample_author <- "buonomo"
+#And the file label for the nomenclature scheme being used
+#Examples: "zhang_healthy_" or "guilliams_healthy_cell_" if specifying sc/sn 
+sample_name <- "buonomo_healthy_"
+#Add sample abbreviation for meta data annotation, Example: "zh" or "zhc" 
+sample_label <- "bhc"
+fig_lab <- "bhc"
+
+#Where to find the cell ranger outputs 
+dir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/"
+datadir <- dir
+
+#Where to save the final object to
+outdir <- paste0("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/scater/",sample_author,"/")
+#Where to save the plots to
+fig_path <- paste0("~/Desktop/scater/",sample_author,"/")
+#Where to save the outlier labels to 
+label_dir <- paste0(outdir,"outlier_labels/")
+
+
+Files <- list()
+Raws <- list()
+Destination <- list()
+for (i in range){
+  Files[[i]] <- paste0(datadir,sample_author,"/",sample_name, i,"/outs/filtered_feature_bc_matrix/")
+  Raws[[i]] <- paste0(datadir,sample_author,"/",sample_name, i, "/outs/raw_feature_bc_matrix/")
+  Destination[[i]] <- paste0(outdir,sample_name,i,"_UMAP.rds")
+}
+
+
+#If the destination directories don't exist, make them 
+if (!dir.exists(outdir)){
+  dir.create(outdir)
+}
+
+if (!dir.exists(fig_path)){
+  dir.create(fig_path)
+}
+
+if (!dir.exists(label_dir)){
+  dir.create(label_dir)
+}
+
+```
+
+## Step 2 : Speficy Meta Data  
+```{r, specify meta data}
+#Provide a list of the meta data in the order that the samples are loaded
+#Patient IDs 
+patient <- c()
+sex <- c()
+age <- c()
+aetiology <- c()
+fibrosis_score <- c()
+fibrosis_stage <- c()
+
+p1 <- c(13:16, 21:24)
+p2 <- c(1:4, 5:8)
+p3 <- c(25:28, 39:42)
+p4 <- c(9:12, 17:20)
+p5 <- c(32:35)
+p6 <- c(29:31, 36, 43:46)
+p7 <- c(37:38, 47:49, 50:52)
+
+for (i in p1){
+  patient[i] <- "bhc_p1"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "0"
+  fibrosis_stage[i] <- "none-low"
+}
+
+#2
+for (i in p2){
+  patient[i] <- "bhc_p2"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "1"
+  fibrosis_stage[i] <- "none-low"
+}
+
+for (i in p3){
+  patient[i] <- "bhc_p3"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "0"
+  fibrosis_stage[i] <- "none-low"
+}
+
+for (i in p4){
+  patient[i] <- "bhc_p4"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "0"
+  fibrosis_stage[i] <- "none-low"
+}
+#5
+for (i in p5){
+  patient[i] <- "bhc_p5"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "1"
+  fibrosis_stage[i] <- "none-low"
+}
+
+#6
+for (i in p6){
+  patient[i] <- "bhc_p6"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "1"
+  fibrosis_stage[i] <- "none-low"
+}
+
+for (i in p7){
+  patient[i] <- "bhc_p7"
+  sex[i] <- "Unknown"
+  age[i] <- "Unknown"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "0"
+  fibrosis_stage[i] <- "none-low"
+}
+```
+
+
+```{r, load data}
+setwd(datadir)
+
+#This loop downloads all of the specified data files
+#Converts them into Seaurt Objects, and stores them in a list 
+Sce <- list()
+
+
+  
+#Converts them into Seaurt Objects, 
+#Then runs decontX to remove ambient RNA
+#And finally stores all of the objects as a list 
+#and stores them in a list 
+for (i in range) {
+  #Create seurat objects and add mt% column 
+  counts <- Read10X(Files[[i]])
+  nam <- paste0(sample_label, i)
+  seurat_object <- CreateSeuratObject(counts = counts, project = nam)
+  seurat_object[["percent.mt"]] <- PercentageFeatureSet(seurat_object, pattern = "^MT-")
+  #Then run decontX, using cellrnager raw counts matrix to calibrate 
+  counts.raw <- Read10X(Raws[[i]])
+  counts2 <- GetAssayData(object = seurat_object, slot = "counts")
+  sce_counts2 <- SingleCellExperiment(list(counts = counts2))
+  sce.raw <- SingleCellExperiment(list(counts = counts.raw))
+  sce_X <- decontX(sce_counts2, background = sce.raw)
+  seurat_object[["decontXcounts"]] <- CreateAssayObject(counts = decontXcounts(sce_X))
+  #Then reset the default assay to "RNA" to run doublet finder
+  DefaultAssay(seurat_object) <- "decontXcounts"
+  Sce[[i]] <- seurat_object
+  #assign(nam, Sce[[i]])
+}
+
+```
+
+
+
+## Filter for mt%/count/feature past 3 nmad (or otherwise specified above)
+```{r, mt and count filter}
+filtered_sizes <- list()
+NSce <- list()
+raw_counts <- list()
+
+for (i in range){
+  #Store the raw unfiltered size
+  filtered_sizes[[i]] <- paste0(fig_lab,i,"_raw")
+  filtered_sizes[[i]][2] <- ncol(Sce[[i]])
+  raw_counts <- c(raw_counts, paste0(fig_lab,i,"_raw"))
+  raw_counts <- c(raw_counts, ncol(Sce[[i]]))
+  #Normalize and create single cell experiment object
+  NSce[[i]] <- Sce[[i]]
+  NSce[[i]] <- NormalizeData(object = NSce[[i]])
+  NSce[[i]] <- FindVariableFeatures(object = NSce[[i]])
+  NSce[[i]] <- ScaleData(NSce[[i]])
+  sce <- as.SingleCellExperiment(NSce[[i]])
+  #Calculate outliers
+  sce <- addPerCellQC(sce, subsets=list(mito=grep("^MT-", rownames(sce))))
+  count_outlier <- isOutlier(sce$detected, nmads=nmad, type="lower", log=TRUE, batch = sce$broad_enrichment)
+  detected_outlier <- isOutlier(sce$sum, nmads=nmad, type="lower", log=TRUE, batch = sce$broad_enrichment)
+  mt_outlier <- isOutlier(sce$subsets_mito_percent, nmads=mt_nmad, type="higher", batch = sce$broad_enrichment)
+  sce$count_outlier <- count_outlier
+  sce$detected_outlier <- detected_outlier
+  sce$mt_outlier <- mt_outlier
+  sce$final_outlier <- count_outlier | detected_outlier | mt_outlier
+  #plot QC outliers (normalized)
+  fig1_name = paste0(fig_lab,i,"_sum_v_detected_NORM.pdf")
+  plt1 <- plotColData(sce, x = "sum", y="detected", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = plt1)
+  plt1
+  plt2 <- plotColData(sce, x = "subsets_mito_percent", y="detected", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig_lab,i,"_mt_v_detected_NORM.pdf"), plot = plt2)
+  plt2
+  plt3 <- plotColData(sce, x = "subsets_mito_percent", y="sum", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig_lab,i,"_mt_v_sum_NORM.pdf"), plot = plt3)
+  plt3
+  #Add to non-normalized data 
+  non_n_sce <- as.SingleCellExperiment(Sce[[i]])
+  non_n_sce$count_outlier <- count_outlier
+  non_n_sce$detected_outlier <- detected_outlier
+  non_n_sce$mt_outlier <- mt_outlier
+  non_n_sce$final_outlier <- count_outlier | detected_outlier | mt_outlier
+  #plot QC outliers (non-normalized)
+  fig1_name = paste0(fig_lab,i,"_sum_v_detected_RAW.pdf")
+  plt1 <- plotColData(non_n_sce, x = "nCount_decontXcounts", y="nFeature_decontXcounts", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = plt1)
+  plt1
+  plt2 <- plotColData(non_n_sce, x = "percent.mt", y="nFeature_decontXcounts", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig_lab,i,"_mt_v_detected_RAW.pdf"), plot = plt2)
+  plt2
+  plt3 <- plotColData(non_n_sce, x = "percent.mt", y="nCount_decontXcounts", colour_by="final_outlier")
+  ggsave(filename = paste0(fig_path, fig_lab,i,"_mt_v_sum_RAW.pdf"), plot = plt3)
+  plt3
+  #remove QC outliers
+  filtered_sizes[[i]][3] <- paste0(fig_lab,i,"_count_outliers")
+  filtered_sizes[[i]][4] <- sum(count_outlier)
+  filtered_sizes[[i]][5] <- paste0(fig_lab,i,"_detected_outlier")
+  filtered_sizes[[i]][6] <- sum(detected_outlier)
+  filtered_sizes[[i]][7] <- paste0(fig_lab,i,"_mt_outlier")
+  filtered_sizes[[i]][8] <- sum(mt_outlier)
+  filtered_sizes[[i]][9] <- paste0(fig_lab,i,"_final_outlier")
+  filtered_sizes[[i]][10] <- sum(sce$final_outlier)
+  #Update the seurat objects
+  #Sce[[i]] <- subset(Sce[[i]], cells = colnames(sce))
+  Sce[[i]]$count_outlier <- count_outlier
+  Sce[[i]]$detected_outlier <- detected_outlier
+  Sce[[i]]$mt_outlier <- mt_outlier
+  Sce[[i]]$final_outlier <- count_outlier | detected_outlier | mt_outlier
+  final_outlier <- count_outlier | detected_outlier | mt_outlier
+  #Save the outlier labels in case I want to use them later 
+  saveRDS(count_outlier, file = paste0(label_dir,fig_lab,i,"_scater_count_outlier.rds"))
+  saveRDS(detected_outlier, file = paste0(label_dir,fig_lab,i,"_scater_detected_outlier.rds"))
+  saveRDS(mt_outlier, file = paste0(label_dir,fig_lab,i,"_scater_mt_outlier.rds"))
+  saveRDS(final_outlier, file = paste0(label_dir,fig_lab,i,"_scater_final_outlier.rds"))
+  #Specific for this run! Also adding the mt < 30 and nFeature > 100 cutoff
+  #So that I can just add these columns to the hard-filter object if wanted
+  sub <- subset(Sce[[i]], subset = nFeature_RNA > 100 & percent.mt < 30)
+  saveRDS(sub$count_outlier, file = paste0(label_dir,fig_lab,i,"_scater_count_outlier_100-30_filtered.rds"))
+  saveRDS(sub$detected_outlier, file = paste0(label_dir,fig_lab,i,"_scater_detected_outlier100-30_filtered.rds"))
+  saveRDS(sub$mt_outlier, file = paste0(label_dir,fig_lab,i,"_scater_mt_outlier100-30_filtered.rds"))
+  saveRDS(sub$final_outlier, file = paste0(label_dir,fig_lab,i,"_scater_final_outlier100-30_filtered.rds"))
+}
+
+saveRDS(filtered_sizes, file = paste0(outdir,fig_lab,"_scater_filtered_dims.rds"))
+saveRDS(filtered_sizes, file = paste0(fig_path,fig_lab,"_scater_filtered_dims.rds"))
+saveRDS(raw_counts, file = paste0(outdir,fig_lab,"_raw_counts.rds"))
+#for (i in range){
+#  saveRDS(Sce[[i]], file = paste0(outdir,fig_lab,i,"_scater_object_rds"))
+#} 
+```
+
+## Save violin plots for each of the filter criteria 
+```{r}
+#vln plot
+for (i in range){
+  sub <- subset(Sce[[i]], final_outlier == "FALSE")
+  vln <- VlnPlot(sub, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+  fig1_name = paste0(fig_lab,i,"_vln_sacter_filtered.pdf")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = vln)
+  vln
+}
+```
+
+## Add Meta Data and save 
+```{r add meta data}
+for (i in range){
+  Sce[[i]]$patient <- patient[[i]]
+  Sce[[i]]$sex <- sex[[i]]
+  Sce[[i]]$age <- age[[i]]
+  Sce[[i]]$aetiology <- aetiology[[i]]
+  Sce[[i]]$fibrosis_score <- fibrosis_score[[i]]
+  Sce[[i]]$fibrosis_stage <- fibrosis_stage[[i]]
+  #If remove is set to TRUE the outliers are removed before saving
+  if (remove == "TRUE"){
+    Sce[[i]] <- subset(Sce[[i]], final_outlier == "FALSE")
+  }
+  saveRDS(Sce[[i]], file = paste0(outdir,fig_lab,i,"_scater_object.rds"))
+}
+```
+
+
+
+
+## Filter for upper bound expression outliers 
+##The remaining blocks don't run
+## To run the remaining blocks change the "eval=FALSE" to "eval=TRUE"
+```{r, expression outliers, eval=FALSE}
+#Quickly make a list with shifted indexing for the merge function
+Sce_t <- list()
+for (i in range){
+  if (i != 1){
+    m = i - 1
+    Sce_t[[m]] <- Sce[[i]]
+  }
+}
+
+#And make a list of cell.ids to split the individual samples after this step
+cell.ids <- paste0(fig_lab,range)
+
+#Create one large merged seurat object
+object_merged <- merge(Sce[[1]], y = Sce_t, add.cell.ids = cell.ids, project = paste0(fig_lab,"_merged_QC"))
+
+#determine expression outliers
+#Set the default assay back to decontXcounts and normalize the entire merged object 
+#This is necessary for the VariableFeatures() function 
+DefaultAssay(object_merged) <- "decontXcounts"
+object_merged <- NormalizeData(object_merged)
+#Find the variable features 
+VariableFeatures(object_merged) <- SelectIntegrationFeatures(lapply(X = SplitObject(object_merged, split.by = "orig.ident"), FUN = function(x) {x <- FindVariableFeatures(x, verbose = F)}))
+#Scale the data and run PCA
+object_merged <- object_merged %>%
+ScaleData() %>%
+RunPCA()
+#Then label expression outliers 
+x <- as.matrix(object_merged[["pca"]]@cell.embeddings)
+y <- LOF(x, log = F, ncores = 8)
+outliers <- isOutlier(y, log = T, type = "higher")
+object_merged$expression_outliers <- outliers
+
+#remove expression outliers
+dim(object_merged)
+object_merged <- subset(object_merged, expression_outliers == FALSE)
+dim(object_merged)
+```
+
+
+
+
+## Remove weakly expressed genes 
+```{r, remove weak genes (if merged object),eval=FALSE }
+#remove weakly expressed genes
+counts <- GetAssayData(object = object_merged, slot = "counts")
+nonzero <- counts > 0
+keep_genes <- Matrix::rowSums(nonzero) > 3
+removed_genes <- setdiff(rownames(object_merged2), names(keep_genes))
+filtered_counts <- counts[keep_genes, ]
+#Form a new seurat object using this filtered counts matrix
+object_merged2 <- CreateSeuratObject(filtered_counts, meta.data = object_merged@meta.data)
+
+#Split the merged object back into individual seurat objects 
+for (i in range){
+  Sce[[i]] <- subset(object_merged2, subset = orig.ident == paste0(fig_lab,i))
+}
+
+saveRDS(filtered_sizes, file = paste0(dir,"rf_filtered_dims.rds"))
+```
+
+```{r, remove weak genes (without merging), eval=FALSE}
+ranget <- 8:9
+for (i in ranget){
+  counts <- GetAssayData(object = Sce[[i]], slot = "counts")
+  nonzero <- counts > 0
+  keep_genes <- Matrix::rowSums(nonzero) > 3
+  removed_genes <- setdiff(rownames(Sce[[i]]), names(keep_genes))
+  filtered_counts <- counts[keep_genes, ]
+  Sce[[i]] <- CreateSeuratObject(filtered_counts, meta.data = Sce[[i]]@meta.data)
+}
+saveRDS(filtered_sizes, file = paste0(dir,"rf_filtered_dims.rds"))
+```
+
