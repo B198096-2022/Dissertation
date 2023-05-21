@@ -102,7 +102,7 @@ for (i in range){
 ```{r, specify meta data}
 #Provide a list of the meta data in the order that the samples are loaded
 #Patient IDs 
-patient <- c("bfc_p1", "bfc_p2", "bfc_p2", "bfc_p3", "bfc_p4", "bfc_p4")
+patient <- c("gfc_p1", "gfc_p2", "gfc_p2", "gfc_p3", "gfc_p4", "gfc_p4")
 
 #Patient Sex
 sex <- c("Female", "Female", "Female", "Female", "Female", "Female")
