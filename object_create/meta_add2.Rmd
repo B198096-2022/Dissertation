@@ -1,0 +1,114 @@
+---
+title: "g"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+# Add meta data
+```{r}
+#.libPaths() tells you where your packages are stored 
+#"/Library/Frameworks/R.framework/Versions/4.2/Resources/library"
+normal_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/library"
+#I created a new directory that branches from the standard package directory
+old_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/old-versions"
+
+#Then I used the below commands to install the old Seurat and SeuratObject 
+#install_version("Seurat", version = "4.3", lib = old_lib)
+#install_version("SeuratObject", version = "4.1.3", lib = old_lib)
+library("SeuratObject", lib.loc = old_lib)
+library("Seurat", lib.loc = old_lib)
+
+#Specify the files you want to run 
+
+#How many samples are there in your data set
+#Example: zhang healthy has 20 samples so range <- 1:20
+range <- 1:6
+#Specify the author of the data set for labeling, example: "zhang" 
+sample_author <- "guilliams"
+#And the file label for the nomenclature scheme being used
+#Examples: "zhang_healthy_" or "guilliams_healthy_cell_" if specifying sc/sn 
+sample_name <- "guilliams_fibrosis_cell_"
+#Add sample abbreviation for meta data annotation, Example: "zh" or "zhc" 
+sample_label <- "gfc"
+fig_lab <- "gfc"
+
+#Specify where the samples are stored (cellranger output directories)
+#Example: datadir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/"
+#Here the "cellranger" datadir holds a directory for each author, 
+#with subdirs for each sample. This is the default of the submit.jobs.sh scripts 
+#Specify where to upload the outputs to 
+outdir <- paste0("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/SeuratObjects/",sample_author,"/")
+
+#outdir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/QC/decontx_after/"
+
+
+Files <- list()
+for (i in range){
+  Files[[i]] <- paste0(outdir,sample_label,i,"_dx_SeuratObject.rds")
+}
+```
+
+## Step 2 : Speficy Meta Data  
+
+```{r, specify meta data}
+#Provide a list of the meta data in the order that the samples are loaded
+#Patient IDs 
+patient <- c("gfc_p1", "gfc_p2", "gfc_p2", "gfc_p3", "gfc_p4", "gfc_p4")
+
+#Patient Sex
+sex <- c("Female", "Female", "Female", "Female", "Female", "Female")
+
+#Patient age, I am using 10 year bins 
+age <- c("70-79", "70-79", "70-79", "70-79", "40-49", "40-49")
+
+#Any information about disease/cause of resection 
+aetiology <- c("Symptomatic cholecystolithiasis", "Hepatocellular carcinoma", "Hepatocellular carcinoma", "Morbid obesity", "Symptomatic cholecystolithiasis Liver", "Symptomatic cholecystolithiasis")
+
+#Fibrosis score from 0-4
+fibrosis_score <- c("unknown", "unknown", "unknown", "unknown", "unknown", "unknown")
+
+#fibrosis stage, from none-low(0-1), moderate (2-3), severe(4+)
+fibrosis_stage <- c("moderate", "severe", "severe", "moderate", "moderate", "moderate")
+
+
+```
+
+
+
+
+## Download Objects
+```{r}
+for (i in range){
+  Sce[[i]] <- readRDS(Files[[i]])
+}
+```
+
+
+## Step 5 : Add Meta Data 
+```{r add meta data}
+for (i in range){
+  Sce[[i]]$patient <- patient[[i]]
+  Sce[[i]]$sex <- sex[[i]]
+  Sce[[i]]$age <- age[[i]]
+  Sce[[i]]$aetiology <- aetiology[[i]]
+  Sce[[i]]$fibrosis_score <- fibrosis_score[[i]]
+  Sce[[i]]$fibrosis_stage <- fibrosis_stage[[i]]
+}
+```
+
+
+## Save the object 
+```{r}
+#Save the final objects 
+for (i in range){
+  saveRDS(Sce[[i]], file = paste0(outdir,sample_label,i,"_dx_SeuratObject.rds"))
+}
+
+```
