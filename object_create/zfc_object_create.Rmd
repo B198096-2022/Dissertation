@@ -1,0 +1,298 @@
+---
+title: "zfc_object_create"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#DoubletFinder is currently incompatible with Seurat v5 objects 
+#Soooo I need to set up an R session with the old Seurat and SeuratObject 
+#Run DoubeltFinder in this session, save the DF results
+#Then return to the rest of the pipeline as add these results to the s5 objects 
+
+#These two packages are used to download old package versions 
+#library("remotes")
+#library("fs")
+
+#.libPaths() tells you where your packages are stored 
+#"/Library/Frameworks/R.framework/Versions/4.2/Resources/library"
+normal_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/library"
+#I created a new directory that branches from the standard package directory
+old_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/old-versions"
+
+#Then I used the below commands to install the old Seurat and SeuratObject 
+#install_version("Seurat", version = "4.3", lib = old_lib)
+#install_version("SeuratObject", version = "4.1.3", lib = old_lib)
+library("SeuratObject", lib.loc = old_lib)
+library("Seurat", lib.loc = old_lib)
+
+#And finally, load in the other required packages
+library(dplyr)
+library(patchwork)
+library(sctransform)
+library(celda)
+library(DoubletFinder)
+library(ggplot2)
+#BiocManager::install("glmGamPoi")
+#not binary
+library(glmGamPoi)
+setwd("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer")
+```
+
+
+## Step 1 : Specify the data sets you want processed  
+
+```{r, specify data}
+
+#Specify the files you want to run 
+
+#How many samples are there in your data set
+#Example: zhang healthy has 20 samples so range <- 1:20
+range <- 1:12
+#Specify the author of the data set for labeling, example: "zhang" 
+sample_author <- "zhang"
+#And the file label for the nomenclature scheme being used
+#Examples: "zhang_healthy_" or "guilliams_healthy_cell_" if specifying sc/sn 
+sample_name <- "zhang_fibrosis_"
+#Add sample abbreviation for meta data annotation, Example: "zh" or "zhc" 
+sample_label <- "zfc"
+fig_lab <- "zfc"
+
+#Specify where the samples are stored (cellranger output directories)
+#Example: datadir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/"
+#Here the "cellranger" datadir holds a directory for each author, 
+#with subdirs for each sample. This is the default of the submit.jobs.sh scripts 
+datadir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/cellranger/"
+#Specify where to upload the outputs to 
+outdir <- paste0("/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/SeuratObjects/",sample_author,"/")
+fig_path <- "~/Desktop/QC_plots/"
+#outdir <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/QC/decontx_after/"
+
+#Specify desired filtering parameters 
+mt_cutoff <- 30
+nfeature_cutoff <- 100
+ncount_cutoff <- 0
+
+#This loop generates lists of file locations and destinations 
+Files <- list()
+Raws <- list()
+Destination <- list()
+for (i in range){
+  Files[[i]] <- paste0(datadir,sample_author,"/",sample_name, i,"/outs/filtered_feature_bc_matrix/")
+  Raws[[i]] <- paste0(datadir,sample_author,"/",sample_name, i, "/outs/raw_feature_bc_matrix/")
+  Destination[[i]] <- paste0(outdir,sample_name,i,"_UMAP.rds")
+}
+
+
+#Files <- paste0(datadir,sample_author,"/",sample_name, range,"/outs/filtered_feature_bc_matrix/")
+#Raws <- paste0(datadir,sample_author,"/",sample_name, range, "/outs/raw_feature_bc_matrix/")
+#Destination <- paste0(outdir,sample_name,range,"_UMAP.rds")
+
+```
+
+## Step 2 : Speficy Meta Data  
+
+```{r, specify meta data}
+#Provide a list of the meta data in the order that the samples are loaded
+#Patient IDs 
+patient <- c()
+sex <- c()
+age <- c()
+aetiology <- c()
+fibrosis_score <- c()
+fibrosis_stage <- c()
+
+p1 <- 1:8
+p2 <- 9:12
+for (i in p1){
+  patient[i] <- "zfc_p1"
+  sex[i] <- "Male"
+  age[i] <- "30-39"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "4"
+  fibrosis_stage[i] <- "severe"
+}
+
+for (i in p2){
+  patient[i] <- "zfc_p2"
+  sex[i] <- "Female"
+  age[i] <- "40-49"
+  aetiology[i] <- "Unknown"
+  fibrosis_score[i] <- "4"
+  fibrosis_stage[i] <- "severe"
+}
+
+```
+
+
+
+## Step 3 : Create seurat objects and remove ambient RNA 
+
+```{r, load data}
+setwd(datadir)
+
+#This loop downloads all of the specified data files
+#Converts them into Seaurt Objects, and stores them in a list 
+Sce <- list()
+
+
+#Converts them into Seaurt Objects, 
+#Then runs decontX to remove ambient RNA
+#And finally stores all of the objects as a list 
+#and stores them in a list 
+for (i in range) {
+  #Create seurat objects and add mt% column 
+  counts <- Read10X(Files[[i]])
+  nam <- paste0(sample_label, i)
+  seurat_object <- CreateSeuratObject(counts = counts, project = nam)
+  seurat_object[["percent.mt"]] <- PercentageFeatureSet(seurat_object, pattern = "^MT-")
+  #Then run decontX, using cellrnager raw counts matrix to calibrate 
+  counts.raw <- Read10X(Raws[[i]])
+  counts2 <- GetAssayData(object = seurat_object, slot = "counts")
+  sce_counts2 <- SingleCellExperiment(list(counts = counts2))
+  sce.raw <- SingleCellExperiment(list(counts = counts.raw))
+  sce_X <- decontX(sce_counts2, background = sce.raw)
+  seurat_object[["decontXcounts"]] <- CreateAssayObject(counts = decontXcounts(sce_X))
+  #Then reset the default assay to "RNA" to run doublet finder
+  DefaultAssay(seurat_object) <- "RNA"
+  Sce[[i]] <- seurat_object
+  #assign(nam, Sce[[i]])
+}
+
+
+```
+
+## Step 3.5 Save QC plots pre-filtering
+```{r}
+for (i in range){
+  #vln plot
+  vln <- VlnPlot(Sce[[i]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+  fig1_name = paste0("vln_unfiltered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = vln)
+  vln
+  #Feature scatter count v mt
+  plot1 <- FeatureScatter(Sce[[i]], feature1 = "nCount_RNA", feature2 = "percent.mt")
+  fig2_name = paste0("count_v_mt_unfiltered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig2_name), plot = plot1)
+  plot1
+  #Feature scatter count v featre
+  plot2 <- FeatureScatter(Sce[[i]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  fig3_name = paste0("count_v_feature_unfiltered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig3_name), plot = plot2)
+  plot2
+  #Feature scatter feature v mt
+  plot3 <- FeatureScatter(Sce[[i]], feature1 = "nFeature_RNA", feature2 = "percent.mt")
+  fig4_name = paste0("feature_v_mt_unfiltered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig4_name), plot = plot2)
+  plot3
+}
+
+
+
+
+```
+
+
+
+## Step 4 : QC Threshold Filtering (For DoubletFinder) 
+```{r, filter}
+#This step removes low quality cells that do not meet the
+#thresholding criteria specified in step 1 
+
+#If repeating this step ourside of the automated pipeline, 
+#you can set filter_round to whatever round of filtering this is 
+filter_round <- c()
+
+#If manually re-running filtering and setting new threshold values, specify here 
+#mt_cutoff <- 30
+#nfeature_cutoff <- 100
+#ncount_cutoff <- 0
+
+#these objects will store the counts after each round of filtering 
+unfiltered_counts <- list()
+filtered_sizes <- list()
+
+for (i in range){
+  #Store the raw cell counts
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_raw_cells",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+  unfiltered_counts <- c(unfiltered_counts, ncol(Sce[[i]]))
+  #Filter for mt% based on specified cutoff 
+  Sce[[i]] <- subset(Sce[[i]], subset = percent.mt < mt_cutoff)
+  #Save new cell counts after mt filtering
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_mt_filtered",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+  #Filter for nFeature based on specified cutoff
+  Sce[[i]] <- subset(Sce[[i]], subset = nFeature_RNA > nfeature_cutoff)
+  #Save new cell counts after mt filtering
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_nFeature_filtered",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+  #Filter for nCount based on specified cutoff
+  Sce[[i]] <- subset(Sce[[i]], subset = nCount_RNA > ncount_cutoff)
+  #Save new cell counts after mt filtering
+  filtered_sizes <- c(filtered_sizes, paste0(sample_label, i,"_nCount_filtered",filter_round))
+  filtered_sizes <- c(filtered_sizes, ncol(Sce[[i]]))
+}
+
+#Save the filtered cell counts
+saveRDS(filtered_sizes, file = paste0(outdir,sample_label,"_filtered",filter_round,"_dims.rds"))
+
+
+```
+
+## Step 4.5 Save QC plots post-filtering
+```{r}
+for (i in range){
+  #vln plot
+  vln <- VlnPlot(Sce[[i]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+  fig1_name = paste0("vln_filtered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = vln)
+  vln
+  #Feature scatter count v mt
+  plot1 <- FeatureScatter(Sce[[i]], feature1 = "nCount_RNA", feature2 = "percent.mt")
+  fig2_name = paste0("count_v_mt_filtered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig2_name), plot = plot1)
+  plot1
+  #Feature scatter count v featre
+  plot2 <- FeatureScatter(Sce[[i]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  fig3_name = paste0("count_v_feature_filtered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig3_name), plot = plot2)
+  plot2
+  #Feature scatter feature v mt
+  plot3 <- FeatureScatter(Sce[[i]], feature1 = "nFeature_RNA", feature2 = "percent.mt")
+  fig4_name = paste0("feature_v_mt_filtered_",fig_lab,i,".pdf")
+  ggsave(filename = paste0(fig_path, fig4_name), plot = plot2)
+  plot3
+}
+
+
+```
+## Step 5 : Add Meta Data 
+```{r add meta data}
+for (i in range){
+  Sce[[i]]$patient <- patient[[i]]
+  Sce[[i]]$sex <- sex[[i]]
+  Sce[[i]]$age <- age[[i]]
+  Sce[[i]]$aetiology <- aetiology[[i]]
+  Sce[[i]]$fibrosis_score <- fibrosis_score[[i]]
+  Sce[[i]]$fibrosis_stage <- fibrosis_stage[[i]]
+}
+```
+
+
+## Save the object 
+```{r}
+#Save the final objects 
+for (i in range){
+  saveRDS(Sce[[i]], file = paste0(outdir,sample_label,i,"_dx_SeuratObject.rds"))
+}
+
+```
+
