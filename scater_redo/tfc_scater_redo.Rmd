@@ -233,6 +233,17 @@ for (i in range){
 }
 ```
 
+## Save violin plots for each of the filter criteria 
+```{r}
+#vln plot
+for (i in range){
+  sub <- subset(Sce[[1]], final_outlier == "FALSE")
+  vln <- VlnPlot(sub, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+  fig1_name = paste0(fig_lab,i,"_vln_sacter_filtered.pdf")
+  ggsave(filename = paste0(fig_path, fig1_name), plot = vln)
+  vln
+}
+```
 
 ## Filter for upper bound expression outliers 
 ##The remaining blocks don't run
