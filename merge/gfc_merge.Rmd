@@ -1,0 +1,86 @@
+---
+title: "gfc_merge"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+old_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/old-versions"
+
+#Then I used the below commands to install the old Seurat and SeuratObject 
+#install_version("Seurat", version = "4.3", lib = old_lib)
+#install_version("SeuratObject", version = "4.1.3", lib = old_lib)
+library("SeuratObject", lib.loc = old_lib)
+library("Seurat", lib.loc = old_lib)
+
+
+options(future.globals.maxSize = 1e12)
+library(dplyr)
+library(patchwork)
+```
+
+/exports/cmvm/datastore/scs/groups/pramacha-GROUP/Max_Hammer/DF_sacter_Objects/guilliams
+
+#Step 10 : Merge the samples for one experiment  
+```{r}
+range <- 1:6
+sample_author <- "guilliams"
+sample_name <- "guilliams_fibrosis_cell_"
+sample_label <- "gfc"
+exp_group <- "fibrosis"
+fig_lab <- sample_label
+outdir <- "~/Desktop/big_pilot/"
+outdir2 <- "/Volumes/cmvm/scs/groups/pramacha-GROUP/Max_Hammer/merged_objects/"
+datadir <- "~/Desktop/big_pilot/"
+
+Files <- list()
+for (i in range){
+  Files[[i]] <- paste0(datadir,sample_author,"/",sample_label, i,"_DF_scater_object.rds")
+}
+
+Sce <- list()
+for (i in range){
+  Sce[[i]] <- readRDS(Files[[i]])
+  DefaultAssay(Sce[[i]]) <- "decontXcounts"
+}
+
+
+options(future.globals.maxSize = 1e12)
+#Quickly make a list with shifted indexing for the merge function
+sce_list_t <- list()
+for (i in range){
+  if (i != 1){
+    m = i - 1
+    sce_list_t[[m]] <- Sce[[i]]
+  }
+}
+
+#And make a list of cell.ids to split the individual samples after this step
+cell.ids <- paste0(sample_label,range)
+
+#Create one large merged seurat object
+object_merged <- merge(Sce[[1]], y = sce_list_t, add.cell.ids = cell.ids, project = paste0(sample_label,"_merged"))
+
+#Add a column in the meta data to specify where the sample came from 
+dataset_group <- list()
+for (i in ncol(object_merged)){
+  dataset_group <- c(dataset_group, sample_label)
+}
+#@meta.data
+object_merged$experiment_group <- exp_group
+object_merged$dataset_group <- dataset_group
+
+#rename the merged object based on the sample label
+merged_name <- paste0(sample_label,"_merged")
+assign(merged_name, object_merged)
+
+####
+
+```
+
+## Save Outputs
+```{r Save}
+saveRDS(object_merged, file = paste0(outdir,sample_label,"_merged_object.rds"))
+saveRDS(object_merged, file = paste0(outdir2,sample_label,"_merged_object.rds"))
+```
