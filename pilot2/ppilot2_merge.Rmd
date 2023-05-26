@@ -1,0 +1,162 @@
+old_lib <- "/Library/Frameworks/R.framework/Versions/4.2/Resources/old-versions"
+library("SeuratObject", lib.loc = old_lib)
+library("Seurat", lib.loc = old_lib)
+
+
+options(future.globals.maxSize = 1e12)
+library(dplyr)
+
+datadir <- "~/Desktop/big_pilot/"
+
+Files <- list()
+
+#Buonomo Fibrosis
+Files[1] <- paste0(datadir,"buonomo/","bfc1_DF_scater_object.rds")
+Files[2] <- paste0(datadir,"buonomo/","bfc10_DF_scater_object.rds")
+
+#Buonomo Healthy
+Files[3] <- paste0(datadir,"buonomo/","bhc1_DF_scater_object.rds")
+Files[4] <- paste0(datadir,"buonomo/","bhc10_DF_scater_object.rds")
+
+
+#Zhang Fibrosis
+Files[5] <- paste0(datadir,"zhang/","zfc1_DF_scater_object.rds")
+Files[6] <- paste0(datadir,"zhang/","zfc10_DF_scater_object.rds")
+
+#Zhang Healthy
+Files[7] <- paste0(datadir,"zhang/","zhc1_DF_scater_object.rds")
+Files[8] <- paste0(datadir,"zhang/","zhc10_DF_scater_object.rds")
+
+
+#Tamburini Fibrosis
+Files[9] <- paste0(datadir,"tamburini/","tfc1_DF_scater_object.rds")
+Files[10] <- paste0(datadir,"tamburini/","tfc2_DF_scater_object.rds")
+
+#Tamburini Healthy
+Files[11] <- paste0(datadir,"tamburini/","thc1_DF_scater_object.rds")
+Files[12] <- paste0(datadir,"tamburini/","thc2_DF_scater_object.rds")
+
+#Ramachandran Fibrosis
+Files[13] <- paste0(datadir,"ramachandran/","rfc1_DF_scater_object.rds")
+Files[14] <- paste0(datadir,"ramachandran/","rfc2_DF_scater_object.rds")
+Files[15] <- paste0(datadir,"ramachandran/","rfc3_DF_scater_object.rds")
+
+#Ramachandran Healthy
+Files[16] <- paste0(datadir,"ramachandran/","rhc7_DF_scater_object.rds")
+Files[17] <- paste0(datadir,"ramachandran/","rhc8_DF_scater_object.rds")
+Files[18] <- paste0(datadir,"ramachandran/","rhc9_DF_scater_object.rds")
+
+#Guilliams Fibrosis
+Files[19] <- paste0(datadir,"guilliams/","gfc5_DF_scater_object.rds")
+Files[20] <- paste0(datadir,"guilliams/","gfc6_DF_scater_object.rds")
+
+
+#Guilliams Healthy
+Files[21] <- paste0(datadir,"guilliams/","ghc3_DF_scater_object.rds")
+Files[22] <- paste0(datadir,"guilliams/","ghc4_DF_scater_object.rds")
+
+
+Sce <- list()
+for (i in 1:21){
+  Sce[[i]] <- readRDS(Files[[(i + 1)]])
+}
+
+#####################################
+first <- readRDS(Files[[1]])
+first$author <- "buonomo"
+first$experiment_group <- "bfc"
+first$healthy_status <- "fibrosis"
+
+Sce[[1]]$author <- "buonomo"
+Sce[[1]]$experiment_group <- "bfc"
+Sce[[1]]$healthy_status <- "fibrosis"
+
+Sce[[2]]$author <- "buonomo"
+Sce[[2]]$experiment_group <- "bhc"
+Sce[[2]]$healthy_status <- "healthy"
+
+Sce[[3]]$author <- "buonomo"
+Sce[[3]]$experiment_group <- "bhc"
+Sce[[3]]$healthy_status <- "healthy"
+
+#####################################
+Sce[[4]]$author <- "zhang"
+Sce[[4]]$experiment_group <- "zfc"
+Sce[[4]]$healthy_status <- "fibrosis"
+
+Sce[[5]]$author <- "zhang"
+Sce[[5]]$experiment_group <- "zfc"
+Sce[[5]]$healthy_status <- "fibrosis"
+
+Sce[[6]]$author <- "zhang"
+Sce[[6]]$experiment_group <- "zhc"
+Sce[[6]]$healthy_status <- "healthy"
+
+Sce[[7]]$author <- "zhang"
+Sce[[7]]$experiment_group <- "zhc"
+Sce[[7]]$healthy_status <- "healthy"
+
+#####################################
+Sce[[8]]$author <- "tamburini"
+Sce[[8]]$experiment_group <- "tfc"
+Sce[[8]]$healthy_status <- "fibrosis"
+
+Sce[[9]]$author <- "tamburini"
+Sce[[9]]$experiment_group <- "tfc"
+Sce[[9]]$healthy_status <- "fibrosis"
+
+Sce[[10]]$author <- "tamburini"
+Sce[[10]]$experiment_group <- "thc"
+Sce[[10]]$healthy_status <- "healthy"
+
+Sce[[11]]$author <- "tamburini"
+Sce[[11]]$experiment_group <- "thc"
+Sce[[11]]$healthy_status <- "healthy"
+
+#####################################
+Sce[[12]]$author <- "ramachandran"
+Sce[[12]]$experiment_group <- "rfc"
+Sce[[12]]$healthy_status <- "fibrosis"
+
+Sce[[13]]$author <- "ramachandran"
+Sce[[13]]$experiment_group <- "rfc"
+Sce[[13]]$healthy_status <- "fibrosis"
+
+Sce[[14]]$author <- "ramachandran"
+Sce[[14]]$experiment_group <- "rfc"
+Sce[[14]]$healthy_status <- "fibrosis"
+
+Sce[[15]]$author <- "ramachandran"
+Sce[[15]]$experiment_group <- "rhc"
+Sce[[15]]$healthy_status <- "healthy"
+
+Sce[[16]]$author <- "ramachandran"
+Sce[[16]]$experiment_group <- "rhc"
+Sce[[16]]$healthy_status <- "healthy"
+
+Sce[[17]]$author <- "ramachandran"
+Sce[[17]]$experiment_group <- "rhc"
+Sce[[17]]$healthy_status <- "healthy"
+
+#####################################
+Sce[[18]]$author <- "guilliams"
+Sce[[18]]$experiment_group <- "gfc"
+Sce[[18]]$healthy_status <- "fibrosis"
+
+Sce[[19]]$author <- "guilliams"
+Sce[[19]]$experiment_group <- "gfc"
+Sce[[19]]$healthy_status <- "fibrosis"
+
+Sce[[20]]$author <- "guilliams"
+Sce[[20]]$experiment_group <- "ghc"
+Sce[[20]]$healthy_status <- "healthy"
+
+Sce[[21]]$author <- "guilliams"
+Sce[[21]]$experiment_group <- "ghc"
+Sce[[21]]$healthy_status <- "healthy"
+
+
+
+pilot2_merged <- merge(first, y = Sce, project = "full_merged")
+meta <- pilot2_merged@meta.data
+saveRDS(meta, file = paste0(datadir, "pilot2_merged_meta.rds"))
