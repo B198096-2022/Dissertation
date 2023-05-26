@@ -106,7 +106,7 @@ if (!dir.exists(label_dir)){
 ```{r, specify meta data}
 #Provide a list of the meta data in the order that the samples are loaded
 #Patient IDs 
-patient <- c("ghc_p1", "ghc_p2", "ghc_p3", "gfc_p3")
+patient <- c("ghc_p1", "ghc_p2", "ghc_p3", "ghc_p3")
 
 #Patient Sex
 sex <- c("Female", "Male", "Male", "Male")
