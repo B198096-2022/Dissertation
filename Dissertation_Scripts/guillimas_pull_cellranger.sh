@@ -1,9 +1,18 @@
-#Guilliams
+############################################################
+#      This is an example of the code used to download     #
+#            fastq files and run cell ranger               #
+#      The Guilliams data sets are used here as an example #
+#   But the code can be changed for any desired data sets  #
+############################################################
 
+
+#These commands were run during an interactive session 
+#They can also be run as a script by including the line below  
+#!/bin/bash
 
 ############################################################
 #                                                          #
-#        Now run the submit.jobs.sh script                 #
+#            run the submit.jobs.sh script                 #
 #                                                          #
 ############################################################
 
