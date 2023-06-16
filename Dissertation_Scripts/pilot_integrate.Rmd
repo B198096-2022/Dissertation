@@ -1,0 +1,491 @@
+---
+title: "pilot_integrate"
+author: "B198096"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#######################################################################
+#                                                                     #
+#               Specify the location of Seruat Package                #
+#                                                                     #
+#######################################################################
+
+```{r}
+library(Seurat)
+options(Seurat.object.assay.version = 'v5')
+library(tidyverse)
+#remotes::install_github('satijalab/azimuth', ref = 'master')
+library(Azimuth)
+library(ggplot2)
+
+datadir <- "path/to/datadir/"
+
+```
+
+#######################################################################
+#                                                                     #
+#                     Load in the merged object                       #
+#                                                                     #
+#######################################################################
+
+```{r}
+all_merged <- readRDS(file ="~/Desktop/big_pilot/pilot2_merged_object.rds")
+```
+
+```{r}
+all_merged[["decontXcounts"]] <- split(all_merged[["decontXcounts"]], f = all_merged$patient)
+```
+
+#Generating unintegrated clusters  
+```{r}
+all_merged <- NormalizeData(all_merged)
+all_merged <- FindVariableFeatures(all_merged)
+all_merged <- ScaleData(all_merged)
+#all_merged <- SCTransform(all_merged)
+all_merged <- RunPCA(all_merged)
+all_merged <- FindNeighbors(all_merged, dims = 1:30, reduction = "pca")
+all_merged <- FindClusters(all_merged, resolution = 2, cluster.name = "unintegrated_clusters")
+
+all_merged <- RunUMAP(all_merged, dims = 1:30, reduction = "pca", reduction.name = "umap.unintegrated")
+```
+
+#######################################################################
+#                                                                     #
+#               Specify scVI conda environment                        #
+#                                                                     #
+#######################################################################
+
+#Running scVI  
+```{r}
+library(SeuratWrappers)
+library(reticulate)
+devtools::install_github("cellgeni/sceasy")
+library(sceasy)
+
+all_merged <- IntegrateLayers(
+  object = all_merged, method = scVIIntegration,
+  new.reduction = "integrated.scvi",
+  conda_env = "/path/to/scvi/conda.env/"
+)
+
+```
+
+#Clustering scVI and saving the dimplots for clusters and doublets
+```{r}
+all_merged <- FindNeighbors(all_merged, reduction = "integrated.scvi", dims = 1:30)
+all_merged <- FindClusters(all_merged, resolution = 2, cluster.name = "scvi_clusters")
+all_merged <- RunUMAP(all_merged, reduction = "integrated.scvi", dims = 1:30, reduction.name = "umap.scvi")
+
+outdir <- datadir
+int_plt_scvi <- DimPlot(
+  all_merged,
+  reduction = "umap.scvi",
+  group.by = c("patient")
+)
+int_plt_scvi_db <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("DoubletFinder"))
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_UMAP.pdf"), plot = int_plt_scvi)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_db_UMAP.pdf"), plot = int_plt_scvi_db)
+saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+#Generating violin plots for QC metrics by cluster 
+```{r}
+scvi_vlnplt_mt <- VlnPlot(all_merged, features = c( "percent.mt"), group.by = c("scvi_clusters"))
+scvi_vlnplt_feature <- VlnPlot(all_merged, features = c( "nFeature_RNA"), group.by = c("scvi_clusters"))
+scvi_vlnplt_count <- VlnPlot(all_merged, features = c( "nCount_RNA"), group.by = c("scvi_clusters"))
+scvi_clusters <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("scvi_clusters"), label=TRUE)
+
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_mt_vln.pdf"), plot = scvi_vlnplt_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_feature_vln.pdf"), plot = scvi_vlnplt_feature)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_count_vln.pdf"), plot = scvi_vlnplt_count)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_clusters.pdf"), plot = scvi_clusters)
+
+unint_plt <- DimPlot(all_merged, reduction = "umap.unintegrated", group.by = c("patient"))
+ggsave(filename = paste0(outdir, "pilot2_unint_UMAP.pdf"), plot = unint_plt)
+```
+
+
+## Running Harmony
+```{r}
+
+all_merged <- IntegrateLayers(
+  object = all_merged, method = HarmonyIntegration,
+  orig.reduction = "pca", new.reduction = "harmony"
+)
+
+
+```
+
+
+## Creating the samll_merged object that removed the tamburini data sets for RPCA and CCA
+#The tamburini data set causes an error with RPCA because it is so small 
+#There are fewer cells in the sample than need to be used as anchors 
+#Error in idx[i, ] <- res[[i]][[1]] : 
+#  number of items to replace is not a multiple of replacement length
+```{r}
+small_merged <- subset(small_merged, subset = (patient != "tfc_p1"))
+small_merged <- subset(small_merged, subset = (patient != "tfc_p2"))
+small_merged <- subset(small_merged, subset = (patient != "thc_p1"))
+small_merged <- subset(small_merged, subset = (patient != "thc_p2"))
+```
+
+## Run RPCA and CCA
+```{r}
+small_merged <- IntegrateLayers(
+  object = small_merged, method = RPCAIntegration,
+  orig.reduction = "pca", new.reduction = "integrated.rpca"
+
+small_merged <- IntegrateLayers(
+  object = small_merged, method = CCAIntegration,
+  orig.reduction = "pca", new.reduction = "integrated.cca"
+)
+```
+
+## Save integrated objects 
+```{r}
+saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI_harmony.rds"))
+saveRDS(small_merged, file = paste0(datadir, "pilot2_rpca_cca.rds"))
+```
+
+
+## Now generating UMAP dimplots and violin plots for the other integrations  
+
+#First Harmony
+```{r}
+all_merged <- FindNeighbors(all_merged, reduction = "harmony", dims = 1:30)
+all_merged <- FindClusters(all_merged, resolution = 2, cluster.name = "harmony_clusters")
+all_merged <- RunUMAP(all_merged, reduction = "harmony", dims = 1:30, reduction.name = "umap.harmony")
+```
+
+
+```{r}
+outdir <- datadir
+int_plt_harmony <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("patient")
+)
+int_plt_harmony_db <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("DoubletFinder"))
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_UMAP.pdf"), plot = int_plt_harmony)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_db_UMAP.pdf"), plot = int_plt_harmony_db)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+```{r}
+harmony_vlnplt_mt <- VlnPlot(all_merged, features = c( "percent.mt"), group.by = c("harmony_clusters"))
+harmony_vlnplt_feature <- VlnPlot(all_merged, features = c( "nFeature_RNA"), group.by = c("harmony_clusters"))
+harmony_vlnplt_count <- VlnPlot(all_merged, features = c( "nCount_RNA"), group.by = c("harmony_clusters"))
+harmony_clusters <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("harmony_clusters"), label=TRUE)
+
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_mt_vln.pdf"), plot = harmony_vlnplt_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_feature_vln.pdf"), plot = harmony_vlnplt_feature)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_count_vln.pdf"), plot = harmony_vlnplt_count)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_clusters.pdf"), plot = harmony_clusters)
+
+
+```
+
+
+#Then RPCA
+```{r}
+small_merged <- FindNeighbors(small_merged, reduction = "integrated.rpca", dims = 1:30)
+small_merged <- FindClusters(small_merged, resolution = 2, cluster.name = "rpca_clusters")
+small_merged <- RunUMAP(small_merged, reduction = "integrated.rpca", dims = 1:30, reduction.name = "umap.rpca")
+```
+
+
+```{r}
+outdir <- datadir
+int_plt_rpca <- DimPlot(
+  small_merged,
+  reduction = "umap.rpca",
+  group.by = c("patient")
+)
+int_plt_rpca_db <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("DoubletFinder"))
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_UMAP.pdf"), plot = int_plt_rpca)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_db_UMAP.pdf"), plot = int_plt_rpca_db)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+```{r}
+rpca_vlnplt_mt <- VlnPlot(small_merged, features = c( "percent.mt"), group.by = c("rpca_clusters"))
+rpca_vlnplt_feature <- VlnPlot(small_merged, features = c( "nFeature_RNA"), group.by = c("rpca_clusters"))
+rpca_vlnplt_count <- VlnPlot(small_merged, features = c( "nCount_RNA"), group.by = c("rpca_clusters"))
+rpca_clusters <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("rpca_clusters"), label=TRUE)
+#
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_mt_vln.pdf"), plot = rpca_vlnplt_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_feature_vln.pdf"), plot = rpca_vlnplt_feature)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_count_vln.pdf"), plot = rpca_vlnplt_count)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_clusters.pdf"), plot = rpca_clusters)
+
+
+```
+
+#Then CCA
+```{r}
+small_merged <- FindNeighbors(small_merged, reduction = "integrated.cca", dims = 1:30)
+small_merged <- FindClusters(small_merged, resolution = 2, cluster.name = "cca_clusters")
+small_merged <- RunUMAP(small_merged, reduction = "integrated.cca", dims = 1:30, reduction.name = "umap.cca")
+```
+
+
+```{r}
+outdir <- datadir
+int_plt_cca <- DimPlot(
+  small_merged,
+  reduction = "umap.cca",
+  group.by = c("patient")
+)
+int_plt_cca_db <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("DoubletFinder"))
+ggsave(filename = paste0(outdir, "pilot2_int_cca_UMAP.pdf"), plot = int_plt_cca)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_db_UMAP.pdf"), plot = int_plt_cca_db)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+```{r}
+cca_vlnplt_mt <- VlnPlot(small_merged, features = c( "percent.mt"), group.by = c("cca_clusters"))
+cca_vlnplt_feature <- VlnPlot(small_merged, features = c( "nFeature_RNA"), group.by = c("cca_clusters"))
+cca_vlnplt_count <- VlnPlot(small_merged, features = c( "nCount_RNA"), group.by = c("cca_clusters"))
+cca_clusters <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("cca_clusters"), label=TRUE)
+#
+ggsave(filename = paste0(outdir, "pilot2_int_cca_mt_vln.pdf"), plot = cca_vlnplt_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_feature_vln.pdf"), plot = cca_vlnplt_feature)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_count_vln.pdf"), plot = cca_vlnplt_count)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_clusters.pdf"), plot = cca_clusters)
+
+
+```
+
+
+
+#Then plot the scater outliers
+
+#CCA
+```{r}
+int_plt_cca_mt <- DimPlot(
+  small_merged,
+  reduction = "umap.cca",
+  group.by = c("mt_outlier")
+)
+#
+int_plt_cca_count <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("count_outlier"))
+#
+int_plt_cca_detected <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("detected_outlier"))
+#
+int_plt_cca_outlier <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("final_outlier"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_cca_mt_UMAP.pdf"), plot = int_plt_cca_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_count_UMAP.pdf"), plot = int_plt_cca_count)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_detected_UMAP.pdf"), plot = int_plt_cca_detected)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_outlier_UMAP.pdf"), plot = int_plt_cca_outlier)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+#RPCA
+```{r}
+int_plt_rpca_mt <- DimPlot(
+  small_merged,
+  reduction = "umap.rpca",
+  group.by = c("mt_outlier")
+)
+#
+int_plt_rpca_count <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("count_outlier"))
+#
+int_plt_rpca_detected <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("detected_outlier"))
+#
+int_plt_rpca_outlier <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("final_outlier"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_mt_UMAP.pdf"), plot = int_plt_rpca_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_count_UMAP.pdf"), plot = int_plt_rpca_count)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_detected_UMAP.pdf"), plot = int_plt_rpca_detected)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_outlier_UMAP.pdf"), plot = int_plt_rpca_outlier)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+##scVI
+```{r}
+int_plt_scvi_mt <- DimPlot(
+  all_merged,
+  reduction = "umap.scvi",
+  group.by = c("mt_outlier")
+)
+#
+int_plt_scvi_count <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("count_outlier"))
+#
+int_plt_scvi_detected <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("detected_outlier"))
+#
+int_plt_scvi_outlier <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("final_outlier"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_mt_UMAP.pdf"), plot = int_plt_scvi_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_count_UMAP.pdf"), plot = int_plt_scvi_count)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_detected_UMAP.pdf"), plot = int_plt_scvi_detected)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_outlier_UMAP.pdf"), plot = int_plt_scvi_outlier)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+##harmony
+```{r}
+int_plt_harmony_mt <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("mt_outlier")
+)
+#
+int_plt_harmony_count <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("count_outlier"))
+#
+int_plt_harmony_detected <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("detected_outlier"))
+#
+int_plt_harmony_outlier <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("final_outlier"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_mt_UMAP.pdf"), plot = int_plt_harmony_mt)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_count_UMAP.pdf"), plot = int_plt_harmony_count)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_detected_UMAP.pdf"), plot = int_plt_harmony_detected)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_outlier_UMAP.pdf"), plot = int_plt_harmony_outlier)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+
+##Adding In Additional Metadata 
+```{r}
+meta <- readRDS(paste0(datadir, "pilot2_merged_meta.rds"))
+all_merged$author <- meta$author
+all_merged$experiment_group <- meta$experiment_group
+all_merged$healthy_status <- meta$healthy_status
+
+saveRDS(old_meta, file = "~/Desktop/big_pilot/pilot2_old_meta.rds")
+
+#fix the ghc4 typo
+all_merged$patient <- meta$patient
+
+small_meta <- subset(meta, subset = (author != "tamburini"))
+
+small_merged$author <- small_meta$author
+small_merged$experiment_group <- small_meta$experiment_group
+small_merged$healthy_status <- small_meta$healthy_status
+
+saveRDS(old_meta, file = "~/Desktop/big_pilot/pilot2_old_small_meta.rds")
+
+#fix the ghc4 typo
+small_merged$patient <- small_meta$patient
+```
+
+
+## Now plot by author, exp, health, and redo patient 
+
+#unintegrated 
+```{r}
+unint_plt_author <- DimPlot(
+  small_merged,
+  reduction = "umap.unintegrated",
+  group.by = c("author")
+)
+#
+unint_plt_exp <- DimPlot(small_merged, reduction = "umap.unintegrated", group.by = c("experiment_group"))
+#
+unint_plt_health <- DimPlot(small_merged, reduction = "umap.unintegrated", group.by = c("healthy_status"))
+#
+unint_plt_patient <- DimPlot(small_merged, reduction = "umap.unintegrated", group.by = c("patient"))
+#
+ggsave(filename = paste0(outdir, "pilot2_unint_author_UMAP.pdf"), plot = unint_plt_author)
+ggsave(filename = paste0(outdir, "pilot2_unint_exp_UMAP.pdf"), plot = unint_plt_exp)
+ggsave(filename = paste0(outdir, "pilot2_unint_patient_UMAP.pdf"), plot = unint_plt_patient)
+ggsave(filename = paste0(outdir, "pilot2_unint_health_UMAP.pdf"), plot = unint_plt_health)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+
+
+#RPCA
+```{r}
+int_plt_rpca_author <- DimPlot(
+  small_merged,
+  reduction = "umap.rpca",
+  group.by = c("author")
+)
+#
+int_plt_rpca_exp <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("experiment_group"))
+#
+int_plt_rpca_health <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("healthy_status"))
+#
+int_plt_rpca_patient <- DimPlot(small_merged, reduction = "umap.rpca", group.by = c("patient"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_author_UMAP.pdf"), plot = int_plt_rpca_author)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_exp_UMAP.pdf"), plot = int_plt_rpca_exp)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_patient_UMAP.pdf"), plot = int_plt_rpca_patient)
+ggsave(filename = paste0(outdir, "pilot2_int_rpca_health_UMAP.pdf"), plot = int_plt_rpca_health)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+#CCA
+```{r}
+int_plt_cca_author <- DimPlot(
+  small_merged,
+  reduction = "umap.cca",
+  group.by = c("author")
+)
+#
+int_plt_cca_exp <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("experiment_group"))
+#
+int_plt_cca_health <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("healthy_status"))
+#
+int_plt_cca_patient <- DimPlot(small_merged, reduction = "umap.cca", group.by = c("patient"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_cca_author_UMAP.pdf"), plot = int_plt_cca_author)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_exp_UMAP.pdf"), plot = int_plt_cca_exp)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_patient_UMAP.pdf"), plot = int_plt_cca_patient)
+ggsave(filename = paste0(outdir, "pilot2_int_cca_health_UMAP.pdf"), plot = int_plt_cca_health)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+## scvi
+```{r}
+int_plt_scvi_author <- DimPlot(
+  all_merged,
+  reduction = "umap.scvi",
+  group.by = c("author")
+)
+#
+int_plt_scvi_exp <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("experiment_group"))
+#
+int_plt_scvi_health <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("healthy_status"))
+#
+int_plt_scvi_patient <- DimPlot(all_merged, reduction = "umap.scvi", group.by = c("patient"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_author_UMAP.pdf"), plot = int_plt_scvi_author)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_exp_UMAP.pdf"), plot = int_plt_scvi_exp)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_patient_UMAP.pdf"), plot = int_plt_scvi_patient)
+ggsave(filename = paste0(outdir, "pilot2_int_scvi_health_UMAP.pdf"), plot = int_plt_scvi_health)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
+
+## harmony
+```{r}
+int_plt_harmony_author <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("author")
+)
+#
+int_plt_harmony_exp <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("experiment_group"))
+#
+int_plt_harmony_health <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("healthy_status"))
+#
+int_plt_harmony_patient <- DimPlot(all_merged, reduction = "umap.harmony", group.by = c("patient"))
+#
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_author_UMAP.pdf"), plot = int_plt_harmony_author)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_exp_UMAP.pdf"), plot = int_plt_harmony_exp)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_patient_UMAP.pdf"), plot = int_plt_harmony_patient)
+ggsave(filename = paste0(outdir, "pilot2_int_harmony_health_UMAP.pdf"), plot = int_plt_harmony_health)
+#saveRDS(all_merged, file = paste0(datadir, "pilot2_scVI.rds"))
+```
