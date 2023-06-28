@@ -302,7 +302,47 @@ harmony_plt_study_zhang <- DimPlot(
 harmony_plt_study_zhang + theme(text = element_text(size = 25))
 
 
+###### QC Plots
+#cols = c("#05bfc4", "#f7766d")
 
+harmony_db <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("DoubletFinder"),
+  cols = c("#f7766d", "#cccccc"))
 
+harmony_db + theme(text = element_text(size = 25))
+
+harmony_mo <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("mt_outlier"),
+  cols = c("#cccccc", "#f7766d"))
+
+harmony_mo + theme(text = element_text(size = 25))
+
+harmony_co <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("count_outlier"),
+  cols = c("#cccccc", "#f7766d"))
+
+harmony_co + theme(text = element_text(size = 25))
+
+harmony_fo <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("detected_outlier"),
+  cols = c("#cccccc", "#f7766d"))
+
+harmony_fo + theme(text = element_text(size = 25))
+
+harmony_to <- DimPlot(
+  all_merged,
+  reduction = "umap.harmony",
+  group.by = c("final_outlier"), 
+  cols = c("#cccccc", "#f7766d"))
+
+harmony_to + theme(text = element_text(size = 25))
 
 #
